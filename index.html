@@ -185,7 +185,8 @@ function filtered(){
 function setFilter(f){
   currentFilter=f;
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('tab-'+CSS.escape(f)).classList.add('active');
+  const activeTab = getTabEl(f);
+  if(activeTab) activeTab.classList.add('active');
   render();
 }
 
@@ -193,10 +194,24 @@ function renderTabs(){
   const mgrs=['all',...new Set(ALL.map(b=>b.manager))];
   const labels={'all':'전체'};
   const el=document.getElementById('tabs');
-  el.innerHTML=mgrs.map(m=>{
+  el.innerHTML=mgrs.map((m,i)=>{
     const label=labels[m]||m.replace('임시매장(김혁)','김혁팀').replace('임시매장(민교)','민교팀');
-    return `<div class="tab${m===currentFilter?' active':''}" id="tab-${m}" onclick="setFilter('${m}')">${label}</div>`;
+    return `<div class="tab${m===currentFilter?' active':''}" id="tab-${i}" data-manager="${i}">${label}</div>`;
   }).join('');
+  // 탭 클릭 이벤트 — 담당자명에 공백/특수문자가 있어도 안전하게 처리
+  window.__tabMgrs = mgrs;
+  el.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click', function(){
+      const idx = parseInt(this.dataset.manager);
+      setFilter(window.__tabMgrs[idx]);
+    });
+  });
+}
+
+function getTabEl(f){
+  if(!window.__tabMgrs) return null;
+  const idx = window.__tabMgrs.indexOf(f);
+  return idx>=0 ? document.getElementById('tab-'+idx) : null;
 }
 
 function renderBranches(){
