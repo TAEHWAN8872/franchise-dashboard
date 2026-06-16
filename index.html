@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>프랜차이즈 매출 현황판</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-serif;min-height:100vh;padding:16px;}
+.dash{max-width:1400px;margin:0 auto;}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+.brand{font-size:16px;font-weight:600;color:#7eb8e8;}
+.brand span{color:#fff;}
+.dot{display:inline-block;width:8px;height:8px;background:#3db87a;border-radius:50%;margin-right:8px;animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.top-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.last-update{font-size:11px;color:#6b8fa8;}
+.upload-btn{font-size:11px;padding:5px 12px;background:#1a3a5c;border:0.5px solid #2a5a8a;color:#7eb8e8;border-radius:6px;cursor:pointer;}
+.upload-btn:hover{background:#1e4a70;}
+#fileInput{display:none;}
+
+/* 탭 */
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+.tab{font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;border:0.5px solid #1e3347;color:#6b8fa8;background:transparent;transition:all .2s;}
+.tab:hover{border-color:#2a5a8a;color:#aac4e0;}
+.tab.active{background:#1a3a5c;color:#7eb8e8;border-color:#2a5a8a;}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px;}
+.kpi{background:#111e2e;border-radius:10px;padding:12px 16px;border:0.5px solid #1e3347;}
+.kl{font-size:11px;color:#6b8fa8;margin-bottom:4px;}
+.kv{font-size:22px;font-weight:600;color:#e0f0ff;}
+.ks{font-size:11px;margin-top:3px;}
+.pos{color:#3db87a;}.neg{color:#e05555;}.warn{color:#f0a04a;}
+
+/* 메인 그리드 */
+.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr;}}
+.card{background:#111e2e;border-radius:10px;padding:14px;border:0.5px solid #1e3347;}
+.ctitle{font-size:12px;color:#6b8fa8;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+.filter-sel{font-size:10px;background:#1a2f44;border:0.5px solid #1e3347;color:#aac4e0;padding:3px 8px;border-radius:5px;}
+
+/* 매장 리스트 */
+.branch-scroll{max-height:280px;overflow-y:auto;padding-right:4px;}
+.branch-scroll::-webkit-scrollbar{width:3px;}
+.branch-scroll::-webkit-scrollbar-thumb{background:#1e3347;border-radius:2px;}
+.bi{margin-bottom:9px;}
+.bh{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;align-items:center;}
+.bn{color:#c8dff0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52%;}
+.bv{font-weight:600;color:#e0f0ff;font-size:12px;}
+.binfo{display:flex;align-items:center;gap:5px;}
+.bb{background:#1a2f44;border-radius:3px;height:5px;}
+.bf{height:5px;border-radius:3px;transition:width .8s ease;}
+.badge{font-size:9px;padding:1px 5px;border-radius:3px;}
+.ok{background:#0d3320;color:#3db87a;}
+.wr{background:#3a1f0a;color:#f0a04a;}
+.fl{background:#3a0d0d;color:#e05555;}
+
+/* 차트 */
+.cw{position:relative;height:200px;}
+.cw-sm{position:relative;height:150px;}
+
+/* 하단 */
+.bot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;}
+
+/* 담당자 */
+.mgr-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.mgr-card{background:#0d1b2a;border-radius:7px;padding:9px 12px;border:0.5px solid #1e3347;}
+.mgr-name{font-size:10px;color:#6b8fa8;margin-bottom:3px;}
+.mgr-row{display:flex;justify-content:space-between;align-items:baseline;}
+.mgr-val{font-size:13px;font-weight:600;color:#e0f0ff;}
+.mgr-cnt{font-size:10px;color:#6b8fa8;}
+.mgr-bar{background:#1a2f44;height:3px;border-radius:2px;margin-top:5px;}
+.mgr-bf{height:3px;border-radius:2px;background:#378add;transition:width .8s ease;}
+
+/* 헤더 월 표시 */
+.month-badge{font-size:10px;background:#1a2f44;color:#6b8fa8;padding:2px 8px;border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="dash">
+
+  <!-- 헤더 -->
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span><span>프랜차이즈 매출 현황판</span></div>
+    <div class="top-right">
+      <span class="last-update" id="lastUpdate">데이터 로딩 중...</span>
+      <label class="upload-btn">
+        📂 CSV 업데이트
+        <input type="file" id="fileInput" accept=".csv">
+      </label>
+    </div>
+  </div>
+
+  <!-- 담당자 탭 -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi"><div class="kl">운영 매장 수</div><div class="kv" id="k1">-</div><div class="ks" style="color:#6b8fa8;" id="k1s">-</div></div>
+    <div class="kpi"><div class="kl">매장 평균 월매출</div><div class="kv" id="k2">-</div><div class="ks" id="k2s">-</div></div>
+    <div class="kpi"><div class="kl">목표(3,000만) 달성</div><div class="kv" id="k3">-</div><div class="ks" id="k3s">-</div></div>
+    <div class="kpi"><div class="kl">전월 대비 성장</div><div class="kv" id="k4">-</div><div class="ks" id="k4s">-</div></div>
+    <div class="kpi"><div class="kl">최고 매출 매장</div><div class="kv" id="k5" style="font-size:16px;">-</div><div class="ks" id="k5s" style="color:#6b8fa8;">-</div></div>
+  </div>
+
+  <!-- 메인 -->
+  <div class="main-grid">
+    <div class="card">
+      <div class="ctitle">
+        <span>매장별 평균 매출 vs 목표(3,000만원)</span>
+        <select class="filter-sel" id="sortSel" onchange="renderBranches()">
+          <option value="avg_desc">평균 높은 순</option>
+          <option value="avg_asc">평균 낮은 순</option>
+          <option value="no">매장번호 순</option>
+          <option value="name">매장명 순</option>
+        </select>
+      </div>
+      <div class="branch-scroll" id="branchList"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">월별 합산 매출 추이</div>
+      <div class="cw"><canvas id="trendChart" role="img" aria-label="월별 합산 매출 추이"></canvas></div>
+      <div style="margin-top:14px;">
+        <div class="ctitle">담당자별 관리 매장 평균</div>
+        <div class="mgr-grid" id="mgrGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 하단 -->
+  <div class="bot-grid">
+    <div class="card">
+      <div class="ctitle">달성률 구간 분포</div>
+      <div class="cw-sm"><canvas id="distChart" role="img" aria-label="달성률 구간 분포"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">월별 증감률</div>
+      <div class="cw-sm"><canvas id="growChart" role="img" aria-label="월별 증감률"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">매장별 매출 비중 (상위 15개)</div>
+      <div class="cw-sm"><canvas id="pieChart" role="img" aria-label="매장별 매출 비중"></canvas></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const GOAL = 30000000;
+const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+let ALL = [];
+let currentFilter = 'all';
+let charts = {};
+
+function fmt(n){ return Math.round(n/10000).toLocaleString()+'만'; }
+
+// CSV 파싱
+function parseCSV(text){
+  const lines = text.trim().split('\n');
+  const result = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = lines[i].split(',');
+    if(cols.length < 4) continue;
+    const months = cols.slice(3,15).map(v=>parseInt(v)||0);
+    const vals = months.filter(v=>v>0);
+    if(!vals.length) continue;
+    result.push({
+      no: parseInt(cols[0])||i,
+      manager: cols[1].trim(),
+      name: cols[2].trim(),
+      months: months,
+      avg: Math.round(vals.reduce((s,v)=>s+v,0)/vals.length)
+    });
+  }
+  return result;
+}
+
+function filtered(){
+  if(currentFilter==='all') return ALL;
+  return ALL.filter(b=>b.manager===currentFilter);
+}
+
+function setFilter(f){
+  currentFilter=f;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+CSS.escape(f)).classList.add('active');
+  render();
+}
+
+function renderTabs(){
+  const mgrs=['all',...new Set(ALL.map(b=>b.manager))];
+  const labels={'all':'전체'};
+  const el=document.getElementById('tabs');
+  el.innerHTML=mgrs.map(m=>{
+    const label=labels[m]||m.replace('임시매장(김혁)','김혁팀').replace('임시매장(민교)','민교팀');
+    return `<div class="tab${m===currentFilter?' active':''}" id="tab-${m}" onclick="setFilter('${m}')">${label}</div>`;
+  }).join('');
+}
+
+function renderBranches(){
+  const data=[...filtered()];
+  const sort=document.getElementById('sortSel').value;
+  if(sort==='avg_desc') data.sort((a,b)=>b.avg-a.avg);
+  else if(sort==='avg_asc') data.sort((a,b)=>a.avg-b.avg);
+  else if(sort==='no') data.sort((a,b)=>a.no-b.no);
+  else data.sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+
+  const el=document.getElementById('branchList');
+  el.innerHTML=data.map(b=>{
+    const r=Math.round(b.avg/GOAL*100);
+    const cls=r>=100?'ok':r>=80?'wr':'fl';
+    const lbl=r>=100?'달성':'미달';
+    const bc=r>=100?'#3db87a':r>=80?'#f0a04a':'#e05555';
+    const fill=Math.min(r,130);
+    return `<div class="bi">
+      <div class="bh">
+        <span class="bn" title="${b.name}">${b.name}</span>
+        <div class="binfo">
+          <span class="badge ${cls}">${lbl} ${r}%</span>
+          <span class="bv">${fmt(b.avg)}</span>
+        </div>
+      </div>
+      <div class="bb"><div class="bf" style="width:${Math.min(fill,100)}%;background:${bc};"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function destroyChart(key){
+  if(charts[key]){ charts[key].destroy(); delete charts[key]; }
+}
+
+function renderTrend(data){
+  const sums=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
+  const active=sums.map((v,i)=>({v,i})).filter(x=>x.v>0);
+  if(!active.length) return;
+  const labels=active.map(x=>MONTHS[x.i]);
+  const vals=active.map(x=>Math.round(x.v/100000000*10)/10);
+  destroyChart('trend');
+  charts.trend=new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{labels,datasets:[{label:'합산매출(억)',data:vals,
+      borderColor:'#378add',backgroundColor:'rgba(55,138,221,0.12)',
+      fill:true,tension:0.4,pointRadius:5,pointBackgroundColor:'#378add',
+      pointBorderColor:'#0d1b2a',pointBorderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'억원'}}},
+      scales:{x:{ticks:{color:'#6b8fa8',font:{size:11}},grid:{color:'#1a2f44'}},
+        y:{ticks:{color:'#6b8fa8',font:{size:11},callback:v=>v+'억'},grid:{color:'#1a2f44'}}}}
+  });
+}
+
+function renderDist(data){
+  const avgs=data.map(b=>b.avg);
+  const buckets=[
+    {label:'~1,500만',max:15000000,color:'#a32d2d'},
+    {label:'1500~2000만',max:20000000,color:'#854f0b'},
+    {label:'2000~2500만',max:25000000,color:'#185fa5'},
+    {label:'2500~3000만',max:30000000,color:'#0f6e56'},
+    {label:'3000만~',max:Infinity,color:'#3db87a'},
+  ];
+  let prev=0;
+  const counts=buckets.map(b=>{const c=avgs.filter(v=>v>=prev&&v<b.max).length;prev=b.max;return c;});
+  destroyChart('dist');
+  charts.dist=new Chart(document.getElementById('distChart'),{
+    type:'bar',
+    data:{labels:buckets.map(b=>b.label),
+      datasets:[{data:counts,backgroundColor:buckets.map(b=>b.color),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'개 매장'}}},
+      scales:{x:{ticks:{color:'#6b8fa8',font:{size:9}},grid:{display:false}},
+        y:{ticks:{color:'#6b8fa8',font:{size:10}},grid:{color:'#1a2f44'}}}}
+  });
+}
+
+function renderGrow(data){
+  const sums=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
+  const active=sums.map((v,i)=>({v,i})).filter(x=>x.v>0);
+  if(active.length<2) return;
+  const labels=[],rates=[];
+  for(let i=1;i<active.length;i++){
+    const prev=active[i-1],cur=active[i];
+    labels.push(MONTHS[prev.i]+'→'+MONTHS[cur.i]);
+    rates.push(prev.v?Math.round((cur.v-prev.v)/prev.v*1000)/10:0);
+  }
+  destroyChart('grow');
+  charts.grow=new Chart(document.getElementById('growChart'),{
+    type:'bar',
+    data:{labels,datasets:[{data:rates,backgroundColor:rates.map(v=>v>=0?'#0f6e56':'#a32d2d'),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'%'}}},
+      scales:{x:{ticks:{color:'#6b8fa8',font:{size:10}},grid:{display:false}},
+        y:{ticks:{color:'#6b8fa8',font:{size:10},callback:v=>v+'%'},grid:{color:'#1a2f44'}}}}
+  });
+}
+
+function renderPie(data){
+  const top=[...data].sort((a,b)=>b.avg-a.avg).slice(0,15);
+  const colors=['#378add','#3db87a','#f0a04a','#e05555','#9360d0','#1d9e75','#d85a30','#185fa5','#854f0b','#0f6e56','#a32d2d','#534ab7','#ba7517','#3b6d11','#993556'];
+  destroyChart('pie');
+  charts.pie=new Chart(document.getElementById('pieChart'),{
+    type:'doughnut',
+    data:{labels:top.map(b=>b.name),datasets:[{data:top.map(b=>b.avg),backgroundColor:colors,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.parsed)}}}}
+  });
+}
+
+function renderMgr(data){
+  const mgrs={};
+  data.forEach(b=>{
+    const k=b.manager;
+    if(!mgrs[k]) mgrs[k]={sum:0,cnt:0};
+    mgrs[k].sum+=b.avg; mgrs[k].cnt++;
+  });
+  const entries=Object.entries(mgrs).sort((a,b)=>b[1].sum/b[1].cnt-a[1].sum/a[1].cnt);
+  const maxAvg=Math.max(...entries.map(([,v])=>v.sum/v.cnt));
+  const el=document.getElementById('mgrGrid');
+  el.innerHTML=entries.map(([k,v])=>{
+    const a=Math.round(v.sum/v.cnt);
+    const pct=Math.round(a/maxAvg*100);
+    const cls=a>=GOAL?'pos':'neg';
+    const label=k.replace('임시매장(김혁)','김혁팀').replace('임시매장(민교)','민교팀');
+    return `<div class="mgr-card">
+      <div class="mgr-name">${label}</div>
+      <div class="mgr-row"><span class="mgr-val ${cls}">${fmt(a)}</span><span class="mgr-cnt">${v.cnt}개점</span></div>
+      <div class="mgr-bar"><div class="mgr-bf" style="width:${pct}%;"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function render(){
+  const data=filtered();
+  if(!data.length) return;
+
+  // 평균 매출 계산 (데이터 있는 월만)
+  const avgVal=data.reduce((s,b)=>s+b.avg,0)/data.length;
+  const over=data.filter(b=>b.avg>=GOAL).length;
+  const top=data.reduce((a,b)=>b.avg>a.avg?b:a,data[0]);
+
+  // 전월 대비
+  const sums=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
+  const activeM=sums.map((v,i)=>({v,i})).filter(x=>x.v>0);
+  let growStr='-', growCls='';
+  if(activeM.length>=2){
+    const prev=activeM[activeM.length-2],cur=activeM[activeM.length-1];
+    const g=((cur.v-prev.v)/prev.v*100).toFixed(1);
+    growStr=(g>0?'+':'')+g+'%';
+    growCls=g>=0?'pos':'neg';
+  }
+
+  document.getElementById('k1').textContent=data.length+'개';
+  document.getElementById('k1s').textContent='전체 '+ALL.length+'개 중';
+  document.getElementById('k2').textContent=fmt(avgVal);
+  const d2=((avgVal-GOAL)/GOAL*100).toFixed(1);
+  document.getElementById('k2s').className='ks '+(avgVal>=GOAL?'pos':'neg');
+  document.getElementById('k2s').textContent='목표 대비 '+(d2>0?'+':'')+d2+'%';
+  document.getElementById('k3').textContent=over+'개 ('+Math.round(over/data.length*100)+'%)';
+  document.getElementById('k3s').className='ks '+(over/data.length>=0.5?'pos':'warn');
+  document.getElementById('k3s').textContent='미달 '+(data.length-over)+'개';
+  document.getElementById('k4').textContent=growStr;
+  document.getElementById('k4').className='kv '+(growStr.startsWith('+')?'pos':growStr==='-'?'':'neg');
+  document.getElementById('k4s').textContent=activeM.length>=2?MONTHS[activeM[activeM.length-2].i]+'→'+MONTHS[activeM[activeM.length-1].i]:'';
+  document.getElementById('k5').textContent=fmt(top.avg);
+  document.getElementById('k5s').textContent=top.name;
+
+  renderBranches();
+  renderTrend(data);
+  renderDist(data);
+  renderGrow(data);
+  renderPie(data);
+  renderMgr(data);
+}
+
+function loadCSV(text, filename){
+  ALL=parseCSV(text);
+  if(!ALL.length){ alert('CSV 파싱 실패: 형식을 확인해 주세요.'); return; }
+  currentFilter='all';
+  renderTabs();
+  render();
+  const now=new Date();
+  document.getElementById('lastUpdate').textContent=
+    `${filename} · ${now.toLocaleDateString('ko-KR')} ${now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 업데이트`;
+}
+
+// 파일 업로드
+document.getElementById('fileInput').addEventListener('change',function(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>loadCSV(ev.target.result, file.name);
+  reader.readAsText(file,'UTF-8');
+  e.target.value='';
+});
+
+// 초기 로드 (같은 폴더의 sales_data.csv)
+fetch('sales_data.csv')
+  .then(r=>{ if(!r.ok) throw new Error('not found'); return r.text(); })
+  .then(text=>loadCSV(text,'sales_data.csv'))
+  .catch(()=>{
+    document.getElementById('lastUpdate').textContent='CSV 파일을 업로드해 주세요';
+  });
+</script>
+</body>
+</html>
