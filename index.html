@@ -417,6 +417,7 @@ function renderTrend(data){
   const avgMin=avgVals.length?Math.min(...avgVals):0;
   const avgMax=avgVals.length?Math.max(...avgVals):1;
   const avgPad=Math.round((avgMax-avgMin)*0.2)||500;
+  const AVG_BASE_LINE=2000; // 평균매출 기준선: 2000만원
 
   destroyChart('trend');
   charts.trend=new Chart(document.getElementById('trendChart'),{
@@ -429,6 +430,11 @@ function renderTrend(data){
       {type:'bar',label:'25년 평균',data:avg25,
         backgroundColor:'rgba(255,176,50,0.55)',borderColor:'rgba(255,176,50,0.9)',
         borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:3},
+      // 평균매출 기준선 2000만원
+      {type:'line',label:'평균매출 기준(2000만)',data:labels.map(()=>AVG_BASE_LINE),
+        borderColor:'#ff6b6b',backgroundColor:'transparent',
+        borderWidth:2,borderDash:[6,4],pointRadius:0,
+        yAxisID:'y2',order:0},
       // 합산 꺾은선 (위에 그려짐, y축)
       {type:'line',label:'25년 합산',data:vals25,
         borderColor:'#f59e0b',backgroundColor:'transparent',
@@ -467,7 +473,7 @@ function renderTrend(data){
             if(v>=10000) return (v/10000).toFixed(1)+'억';
             return v.toLocaleString()+'만';
           }},grid:{color:'#1a2f44'}},
-        y2:{position:'right',min:Math.max(0,avgMin-avgPad),max:avgMax+avgPad,
+        y2:{position:'right',min:Math.min(AVG_BASE_LINE,Math.max(0,avgMin-avgPad)),max:avgMax+avgPad,
           title:{display:true,text:'평균 매출',color:'#fbbf24',font:{size:10}},
           ticks:{color:'#fbbf24',font:{size:10},callback:v=>{
             if(v>=10000) return (v/10000).toFixed(1)+'억';
