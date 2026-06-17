@@ -402,6 +402,15 @@ function destroyChart(key){
 
 // 월별 합산 추이 차트: 25년 vs 26년 비교 + 평균매출 라인
 function renderTrend(data){
+  const fmtDetail=v=>{
+    if(v<=0) return '-';
+    if(v>=10000){
+      const uk=Math.floor(v/10000);
+      const rem=v%10000;
+      return rem>0?`${uk}억 ${rem.toLocaleString()}만원`:`${uk}억`;
+    }
+    return v.toLocaleString()+'만원';
+  };
   const sums26=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
   const active=sums26.map((v,i)=>({v,i})).filter(x=>x.v>0);
   if(!active.length) return;
@@ -481,13 +490,15 @@ function renderTrend(data){
               const lbl=c.dataset.label;
               const v=c.parsed.y;
               if(v==null) return null;
-              const fv=v>=10000?(v/10000).toFixed(1)+'억':v.toLocaleString()+'만원';
+              const fv=fmtDetail(v);
               if(lbl==='26년 합산'){
                 const v25=vals25[c.dataIndex]||0;
                 if(v25>0){
                   const rate=Math.round((v-v25)/v25*1000)/10;
                   const sign=rate>=0?'▲':'▼';
-                  return `${lbl}: ${fv}  (전년비 ${sign}${Math.abs(rate)}%)`;
+                  const diff=v-v25;
+                  const diffSign=diff>=0?'+':'-';
+                  return `${lbl}: ${fv}  (전년비 ${sign}${Math.abs(rate)}%,  ${diffSign}${fmtDetail(Math.abs(diff))})`;
                 }
               }
               return `${lbl}: ${fv}`;
@@ -537,16 +548,16 @@ function renderTrend(data){
   });
 
   // ── 월별 합산 수치 요약 카드 ──────────────────────────────
-  const fmtM=v=>v>=10000?(v/10000).toFixed(1)+'억':(v>0?v.toLocaleString()+'만':'-');
   const rows=labels.map((lbl,i)=>{
     const v26=vals26[i]||0, v25=vals25[i]||0;
     const diff=v26-v25;
     const rate=v25>0?Math.round((v26-v25)/v25*1000)/10:null;
     const rateStr=rate!=null?(rate>=0?`<span style="color:#3db87a">▲${rate}%</span>`:`<span style="color:#e05555">▼${Math.abs(rate)}%</span>`):'<span style="color:#6b8fa8">-</span>';
-    const diffStr=diff!==0?(diff>0?`<span style="color:#3db87a">+${fmtM(diff)}</span>`:`<span style="color:#e05555">${fmtM(diff)}</span>`):'<span style="color:#6b8fa8">-</span>';
+    const absDiff=fmtDetail(Math.abs(diff));
+    const diffStr=diff>0?`<span style="color:#3db87a">+${absDiff}</span>`:diff<0?`<span style="color:#e05555">-${absDiff}</span>`:'<span style="color:#6b8fa8">-</span>';
     return `<td style="padding:5px 8px;text-align:center;font-size:10px;color:#6b8fa8;border-bottom:0.5px solid #1a2f44;">${lbl}</td>
-<td style="padding:5px 8px;text-align:right;font-size:10px;color:#38bdf8;border-bottom:0.5px solid #1a2f44;">${fmtM(v26)}</td>
-<td style="padding:5px 8px;text-align:right;font-size:10px;color:#f59e0b;border-bottom:0.5px solid #1a2f44;">${v25>0?fmtM(v25):'-'}</td>
+<td style="padding:5px 8px;text-align:right;font-size:10px;color:#38bdf8;border-bottom:0.5px solid #1a2f44;">${fmtDetail(v26)}</td>
+<td style="padding:5px 8px;text-align:right;font-size:10px;color:#f59e0b;border-bottom:0.5px solid #1a2f44;">${v25>0?fmtDetail(v25):'-'}</td>
 <td style="padding:5px 8px;text-align:center;font-size:10px;border-bottom:0.5px solid #1a2f44;">${rateStr}</td>
 <td style="padding:5px 8px;text-align:right;font-size:10px;border-bottom:0.5px solid #1a2f44;">${diffStr}</td>`;
   });
