@@ -417,12 +417,12 @@ function renderTrend(data){
   charts.trend=new Chart(document.getElementById('trendChart'),{
     type:'bar',
     data:{labels,datasets:[
-      // 평균 막대 (배경에 깔림, y2축) — 26년이 뒤에 그려져 앞에 보임
-      {type:'bar',label:'25년 평균',data:avg25,
-        backgroundColor:'rgba(255,176,50,0.55)',borderColor:'rgba(255,176,50,0.9)',
-        borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:4},
+      // 평균 막대 (배경에 깔림, y2축) — 25년 먼저 선언 → 왼쪽, 26년 → 오른쪽
       {type:'bar',label:'26년 평균',data:avg26,
         backgroundColor:'rgba(56,189,248,0.55)',borderColor:'rgba(56,189,248,0.9)',
+        borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:4},
+      {type:'bar',label:'25년 평균',data:avg25,
+        backgroundColor:'rgba(255,176,50,0.55)',borderColor:'rgba(255,176,50,0.9)',
         borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:3},
       // 합산 꺾은선 (위에 그려짐, y축)
       {type:'line',label:'25년 합산',data:vals25,
