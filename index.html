@@ -25,6 +25,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 .tab{font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;border:1px solid #1e3347;color:#6b8fa8;background:transparent;transition:all .2s;font-weight:500;}
 .tab:hover{border-color:#2a5a8a;color:#aac4e0;}
 .tab.active{color:#fff;font-weight:700;}
+.tab.dimmed{opacity:1;border-color:#1e3347 !important;color:#4a6070 !important;}
 .tab[data-color="전체"]{border-color:#2a5a8a;color:#7eb8e8;}
 .tab[data-color="전체"].active{background:#1a3a5c;border-color:#2a5a8a;color:#7eb8e8;}
 .tab[data-color="김태환 과장"]{border-color:#22c55e;color:#22c55e;}
@@ -352,8 +353,12 @@ function renderTabs(){
 
 function updateTabActive(){
   const mgrs=window.__tabMgrs||[];
+  const hasFilter=currentFilter!=='all';
   document.querySelectorAll('#tabs .tab').forEach((t,i)=>{
-    t.classList.toggle('active', mgrs[i]===currentFilter);
+    const isActive=mgrs[i]===currentFilter;
+    t.classList.toggle('active', isActive);
+    // 전체 선택이거나 본인이 선택된 탭은 dimmed 해제, 나머지는 dimmed
+    t.classList.toggle('dimmed', hasFilter && !isActive && mgrs[i]!=='all');
   });
   const regions=window.__regionList||[];
   document.querySelectorAll('#regionTabs .tab').forEach((t,i)=>{
