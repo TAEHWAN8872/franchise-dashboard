@@ -155,12 +155,12 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 /* 매장 월별 모달 */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
-.modal-box{background:#111e2e;border:0.5px solid #2a5a8a;border-radius:14px;padding:28px 32px 24px;width:96%;max-width:1100px;max-height:90vh;overflow-y:auto;position:relative;}
-.modal-title{font-size:17px;font-weight:700;color:#e0f0ff;margin-bottom:5px;}
-.modal-sub{font-size:12px;color:#6b8fa8;margin-bottom:20px;}
+.modal-box{background:#111e2e;border:0.5px solid #2a5a8a;border-radius:14px;padding:18px 24px 18px;width:96%;max-width:1100px;max-height:92vh;overflow-y:auto;position:relative;}
+.modal-title{font-size:14px;font-weight:700;color:#e0f0ff;margin-bottom:3px;}
+.modal-sub{font-size:11px;color:#6b8fa8;margin-bottom:12px;}
 .modal-close{position:absolute;top:14px;right:16px;background:transparent;border:none;color:#6b8fa8;font-size:18px;cursor:pointer;line-height:1;}
 .modal-close:hover{color:#aac4e0;}
-.modal-cw{position:relative;height:420px;}
+.modal-cw{position:relative;height:260px;}
 </style>
 </head>
 <body>
@@ -272,7 +272,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     <div class="modal-sub" id="modalSub">-</div>
     <div class="modal-cw"><canvas id="modalChart"></canvas></div>
     <!-- 월별 증감 수치 카드 -->
-    <div id="modalSummary" style="margin-top:16px;overflow-x:auto;"></div>
+    <div id="modalSummary" style="margin-top:10px;overflow-x:auto;"></div>
   </div>
 </div>
 
@@ -1033,28 +1033,18 @@ function openBranchModal(b){
     const diffAbs=diff!=null?fmtD(Math.abs(diff)):'-';
     const diffStr=diff!=null?(diff>0?`+${diffAbs}`:diff<0?`-${diffAbs}`:'±0'):'-';
     const diffColor=diff==null?'#6b8fa8':diff>0?'#3db87a':diff<0?'#e05555':'#6b8fa8';
-    return `
-<td style="padding:6px 10px;text-align:center;font-size:10px;color:#6b8fa8;border-bottom:0.5px solid #1a2f44;white-space:nowrap;">${mon}</td>
-<td style="padding:6px 10px;text-align:right;font-size:10px;color:#378add;font-weight:600;border-bottom:0.5px solid #1a2f44;white-space:nowrap;">${v26!=null?fmtD(v26):'-'}</td>
-<td style="padding:6px 10px;text-align:right;font-size:10px;color:#f0a04a;border-bottom:0.5px solid #1a2f44;white-space:nowrap;">${v25!=null?fmtD(v25):'-'}</td>
-<td style="padding:6px 10px;text-align:center;font-size:11px;font-weight:700;color:${rateColor};border-bottom:0.5px solid #1a2f44;white-space:nowrap;">${rateStr}</td>
-<td style="padding:6px 10px;text-align:right;font-size:10px;color:${diffColor};font-weight:600;border-bottom:0.5px solid #1a2f44;white-space:nowrap;">${diffStr}</td>`;
+    return `<div style="min-width:80px;flex:1;background:#0d1b2a;border-radius:7px;padding:7px 8px;border:0.5px solid #1a2f44;text-align:center;">
+  <div style="font-size:9px;color:#6b8fa8;margin-bottom:4px;font-weight:500;">${mon}</div>
+  <div style="font-size:10px;color:#378add;font-weight:600;margin-bottom:2px;">${v26!=null?fmtD(v26):'-'}</div>
+  <div style="font-size:9px;color:#f0a04a;margin-bottom:4px;">${v25!=null?fmtD(v25):'-'}</div>
+  <div style="font-size:11px;font-weight:700;color:${rateColor};margin-bottom:2px;">${rateStr}</div>
+  <div style="font-size:9px;color:${diffColor};font-weight:600;">${diffStr}</div>
+</div>`;
   }).filter(r=>r!==null);
 
   document.getElementById('modalSummary').innerHTML=`
-<div style="font-size:11px;color:#6b8fa8;margin-bottom:8px;font-weight:500;">월별 전년 대비 증감</div>
-<table style="width:100%;border-collapse:collapse;min-width:400px;">
-  <thead>
-    <tr style="background:#0d1b2a;">
-      <th style="padding:6px 10px;text-align:center;font-size:10px;color:#6b8fa8;font-weight:500;">월</th>
-      <th style="padding:6px 10px;text-align:right;font-size:10px;color:#378add;font-weight:500;">26년 매출</th>
-      <th style="padding:6px 10px;text-align:right;font-size:10px;color:#f0a04a;font-weight:500;">25년 매출</th>
-      <th style="padding:6px 10px;text-align:center;font-size:10px;color:#aac4e0;font-weight:500;">전년비</th>
-      <th style="padding:6px 10px;text-align:right;font-size:10px;color:#aac4e0;font-weight:500;">증감액</th>
-    </tr>
-  </thead>
-  <tbody>${summaryRows.map(r=>`<tr style="transition:background .15s;" onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">${r}</tr>`).join('')}</tbody>
-</table>`;
+<div style="font-size:10px;color:#6b8fa8;margin-bottom:6px;font-weight:500;">월별 전년 대비 증감 &nbsp;<span style="color:#378add">■ 26년</span> &nbsp;<span style="color:#f0a04a">■ 25년</span></div>
+<div style="display:flex;gap:5px;flex-wrap:wrap;">${summaryRows.join('')}</div>`;
 }
 
 function closeModal(){
