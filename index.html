@@ -284,44 +284,45 @@ function filtered(){
 
 function setFilter(f){
   currentFilter=f;
-  document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.remove('active'));
-  const idx = window.__tabMgrs ? window.__tabMgrs.indexOf(f) : -1;
-  const el = idx>=0 ? document.getElementById('tab-'+idx) : null;
-  if(el) el.classList.add('active');
   render();
 }
 
 function renderTabs(){
   const mgrs=['all',...new Set(ALL.map(b=>b.manager))];
+  window.__tabMgrs = mgrs;
   const el=document.getElementById('tabs');
   el.innerHTML=mgrs.map((m,i)=>{
     const label=m==='all'?'전체':m;
-    return `<div class="tab${m===currentFilter?' active':''}" id="tab-${i}" data-manager="${i}">${label}</div>`;
+    return `<div class="tab" id="tab-${i}" onclick="setFilter(window.__tabMgrs[${i}])">${label}</div>`;
   }).join('');
-  window.__tabMgrs = mgrs;
-  el.querySelectorAll('.tab').forEach(t=>{
-    t.addEventListener('click',function(){
-      setFilter(window.__tabMgrs[parseInt(this.dataset.manager)]);
-    });
+  updateTabActive();
+}
+
+function updateTabActive(){
+  const mgrs=window.__tabMgrs||[];
+  document.querySelectorAll('#tabs .tab').forEach((t,i)=>{
+    t.classList.toggle('active', mgrs[i]===currentFilter);
+  });
+  const regions=window.__regionList||[];
+  document.querySelectorAll('#regionTabs .tab').forEach((t,i)=>{
+    t.classList.toggle('active', regions[i]===currentRegion);
   });
 }
 
 function renderRegionTabs(){
   const regions=['all',...Array.from(new Set(ALL.map(b=>b.region))).filter(r=>r&&r!=='all').sort((a,b)=>a.localeCompare(b,'ko'))];
+  window.__regionList=regions;
   const el=document.getElementById('regionTabs');
   el.innerHTML=regions.map((r,i)=>{
     const label=r==='all'?'전체':r;
-    return `<div class="tab${r===currentRegion?' active':''}" id="rtab-${i}" data-region="${i}">${label}</div>`;
+    return `<div class="tab" id="rtab-${i}" onclick="setRegion(window.__regionList[${i}])">${label}</div>`;
   }).join('');
-  window.__regionList=regions;
-  el.querySelectorAll('.tab').forEach(t=>{
-    t.addEventListener('click',function(){
-      currentRegion=window.__regionList[parseInt(this.dataset.region)];
-      el.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-      this.classList.add('active');
-      render();
-    });
-  });
+  updateTabActive();
+}
+
+function setRegion(r){
+  currentRegion=r;
+  render();
 }
 
 function destroyChart(key){
@@ -626,6 +627,7 @@ function render(){
   }
 
   buildAllMap();
+  updateTabActive();
   renderBranches(lastIdx);
   renderTrend(data);
   renderDist(data, lastIdx);
