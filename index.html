@@ -164,6 +164,10 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     <div class="card">
       <div class="ctitle">월별 합산 매출 추이 (25년 vs 26년)</div>
       <div class="cw"><canvas id="trendChart" role="img" aria-label="월별 합산 매출 추이"></canvas></div>
+      <div style="margin-top:12px;">
+        <div class="ctitle" style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">월별 매장 수</div>
+        <div class="cw-sm"><canvas id="storeChart" role="img" aria-label="월별 매장 수 추이"></canvas></div>
+      </div>
       <div style="margin-top:14px;">
         <div class="ctitle">담당자별 관리 매장 평균</div>
         <div class="mgr-grid" id="mgrGrid"></div>
@@ -329,7 +333,7 @@ function destroyChart(key){
   if(charts[key]){ charts[key].destroy(); delete charts[key]; }
 }
 
-// 월별 합산 추이 차트: 25년 vs 26년 비교 + 매장 수 보조축
+// 월별 합산 추이 차트: 25년 vs 26년 비교 + 평균매출 라인
 function renderTrend(data){
   const sums26=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
   const active=sums26.map((v,i)=>({v,i})).filter(x=>x.v>0);
@@ -345,47 +349,85 @@ function renderTrend(data){
   // 각 월별 매장 수
   const counts26=active.map(x=>data.filter(b=>(b.months[x.i]||0)>0).length);
   const counts25=active.map(x=>data.filter(b=>(get25(b.name,x.i)||0)>0).length);
+  // 각 월별 평균 매출 (만원)
+  const avg26=active.map((x,i)=>counts26[i]>0?Math.round(vals26[i]/counts26[i]):null);
+  const avg25=active.map((x,i)=>counts25[i]>0?Math.round(vals25[i]/counts25[i]):null);
 
   const allVals=[...vals26,...vals25.filter(v=>v>0)];
   const minVal=Math.min(...allVals);
   const maxVal=Math.max(...allVals);
   const pad=Math.round((maxVal-minVal)*0.15)||Math.round(minVal*0.05)||1000;
   const yMin=Math.max(0, minVal-pad);
+
+  // 평균매출 보조축 범위
+  const avgVals=[...avg26,...avg25].filter(v=>v!=null&&v>0);
+  const avgMin=avgVals.length?Math.min(...avgVals):0;
+  const avgMax=avgVals.length?Math.max(...avgVals):1;
+  const avgPad=Math.round((avgMax-avgMin)*0.2)||500;
+
   destroyChart('trend');
   charts.trend=new Chart(document.getElementById('trendChart'),{
     type:'line',
     data:{labels,datasets:[
       {label:'26년 합산',data:vals26,borderColor:'#378add',backgroundColor:'rgba(55,138,221,0.1)',
         fill:true,tension:0.4,pointRadius:5,pointBackgroundColor:'#378add',
-        pointBorderColor:'#0d1b2a',pointBorderWidth:2,yAxisID:'y'},
+        pointBorderColor:'#0d1b2a',pointBorderWidth:2,yAxisID:'y',order:3},
       {label:'25년 합산',data:vals25,borderColor:'#f0a04a',backgroundColor:'rgba(240,160,74,0.05)',
         fill:true,tension:0.4,pointRadius:4,pointBackgroundColor:'#f0a04a',
-        pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderDash:[4,3],yAxisID:'y'},
-      {label:'매장수(25년)',data:counts25,
-        type:'bar',yAxisID:'y2',order:10,
-        backgroundColor:'rgba(240,160,74,0.35)',borderColor:'rgba(240,160,74,0.8)',
-        borderWidth:1,borderRadius:3},
-      {label:'매장수(26년)',data:counts26,
-        type:'bar',yAxisID:'y2',order:11,
-        backgroundColor:'rgba(55,138,221,0.35)',borderColor:'rgba(55,138,221,0.8)',
-        borderWidth:1,borderRadius:3}
+        pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderDash:[4,3],yAxisID:'y',order:4},
+      {label:'26년 평균',data:avg26,borderColor:'#60cfff',backgroundColor:'transparent',
+        tension:0.4,pointRadius:4,pointBackgroundColor:'#60cfff',
+        pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderWidth:2,
+        borderDash:[6,3],yAxisID:'y2',order:1},
+      {label:'25년 평균',data:avg25,borderColor:'#ffd080',backgroundColor:'transparent',
+        tension:0.4,pointRadius:3,pointBackgroundColor:'#ffd080',
+        pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderWidth:2,
+        borderDash:[6,3],yAxisID:'y2',order:2}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:true,labels:{color:'#aac4e0',font:{size:11},boxWidth:14}},
         tooltip:{callbacks:{label:c=>{
-          if(c.dataset.label.startsWith('매장수')) return `${c.dataset.label}: ${c.parsed.y}개`;
+          if(c.dataset.label.includes('평균')) return c.dataset.label+': '+c.parsed.y.toLocaleString()+'만원';
           return c.dataset.label+': '+c.parsed.y.toLocaleString()+'만원';
         }}}},
       scales:{
         x:{ticks:{color:'#6b8fa8',font:{size:11}},grid:{color:'#1a2f44'}},
-        y:{min:yMin,position:'left',ticks:{color:'#6b8fa8',font:{size:11},callback:v=>{
-          if(v>=10000) return (v/10000).toFixed(1)+'억';
-          return v.toLocaleString()+'만';
-        }},grid:{color:'#1a2f44'}},
-        y2:{position:'right',min:0,
-          max:Math.max(...counts26,...counts25)+Math.round(Math.max(...counts26,...counts25)*0.3),
+        y:{min:yMin,position:'left',
+          title:{display:true,text:'합산 매출',color:'#4a7a9b',font:{size:10}},
+          ticks:{color:'#6b8fa8',font:{size:11},callback:v=>{
+            if(v>=10000) return (v/10000).toFixed(1)+'억';
+            return v.toLocaleString()+'만';
+          }},grid:{color:'#1a2f44'}},
+        y2:{position:'right',min:Math.max(0,avgMin-avgPad),max:avgMax+avgPad,
+          title:{display:true,text:'평균 매출',color:'#4a9ab0',font:{size:10}},
+          ticks:{color:'#60cfff',font:{size:10},callback:v=>{
+            if(v>=10000) return (v/10000).toFixed(1)+'억';
+            return v.toLocaleString()+'만';
+          }},grid:{display:false}}
+      }}
+  });
+
+  // 매장 수 별도 차트
+  destroyChart('store');
+  charts.store=new Chart(document.getElementById('storeChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'매장수(25년)',data:counts25,
+        backgroundColor:'rgba(240,160,74,0.45)',borderColor:'rgba(240,160,74,0.9)',
+        borderWidth:1,borderRadius:3},
+      {label:'매장수(26년)',data:counts26,
+        backgroundColor:'rgba(55,138,221,0.45)',borderColor:'rgba(55,138,221,0.9)',
+        borderWidth:1,borderRadius:3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,labels:{color:'#aac4e0',font:{size:10},boxWidth:12}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}개`}}},
+      scales:{
+        x:{ticks:{color:'#6b8fa8',font:{size:10}},grid:{color:'#1a2f44'}},
+        y:{min:0,
+          max:Math.max(...counts26,...counts25)+Math.ceil(Math.max(...counts26,...counts25)*0.25),
           ticks:{color:'#a78bfa',font:{size:10},callback:v=>Number.isInteger(v)?v+'개':''},
-          grid:{display:false}}
+          grid:{color:'#1a2f44'}}
       }}
   });
 }
