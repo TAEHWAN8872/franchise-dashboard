@@ -116,8 +116,8 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   <!-- KPI -->
   <div class="kpi-row">
     <div class="kpi"><div class="kl">운영 매장 수</div><div class="kv" id="k1">-</div><div class="ks" style="color:#6b8fa8;" id="k1s">-</div></div>
-    <div class="kpi"><div class="kl">매장 평균 월매출</div><div class="kv" id="k2">-</div><div class="ks" id="k2s">-</div></div>
-    <div class="kpi"><div class="kl">목표(3,000만) 달성</div><div class="kv" id="k3">-</div><div class="ks" id="k3s">-</div></div>
+    <div class="kpi"><div class="kl" id="k2l">최근월 평균 매출</div><div class="kv" id="k2">-</div><div class="ks" id="k2s">-</div></div>
+    <div class="kpi"><div class="kl" id="k3l">전년 동월 대비 5% 목표 달성</div><div class="kv" id="k3">-</div><div class="ks" id="k3s">-</div></div>
     <div class="kpi"><div class="kl">전월 대비 성장</div><div class="kv" id="k4">-</div><div class="ks" id="k4s">-</div></div>
     <div class="kpi"><div class="kl">최고 매출 매장</div><div class="kv" id="k5" style="font-size:16px;">-</div><div class="ks" id="k5s" style="color:#6b8fa8;">-</div></div>
   </div>
@@ -126,7 +126,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   <div class="main-grid">
     <div class="card">
       <div class="ctitle">
-        <span>매장별 평균 매출 vs 목표(3,000만원)</span>
+        <span id="branchListTitle">매장별 매출 vs 목표</span>
         <select class="filter-sel" id="sortSel" onchange="renderBranches()">
           <option value="avg_desc">평균 높은 순</option>
           <option value="avg_asc">평균 낮은 순</option>
@@ -137,7 +137,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       <div class="branch-scroll" id="branchList"></div>
     </div>
     <div class="card">
-      <div class="ctitle">월별 합산 매출 추이</div>
+      <div class="ctitle">월별 합산 매출 추이 (25년 vs 26년)</div>
       <div class="cw"><canvas id="trendChart" role="img" aria-label="월별 합산 매출 추이"></canvas></div>
       <div style="margin-top:14px;">
         <div class="ctitle">담당자별 관리 매장 평균</div>
@@ -149,7 +149,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   <!-- 하단 -->
   <div class="bot-grid">
     <div class="card">
-      <div class="ctitle">달성률 구간 분포</div>
+      <div class="ctitle" id="distTitle">달성률 구간 분포</div>
       <div class="cw-sm"><canvas id="distChart" role="img" aria-label="달성률 구간 분포"></canvas></div>
     </div>
     <div class="card">
@@ -157,7 +157,7 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       <div class="cw-sm"><canvas id="growChart" role="img" aria-label="월별 증감률"></canvas></div>
     </div>
     <div class="card">
-      <div class="ctitle">매장별 평균 매출 순위 (상위 15개)</div>
+      <div class="ctitle" id="rankTitle">매출 순위 (상위 15개)</div>
       <div id="rankList" style="overflow-y:auto;max-height:150px;padding-right:2px;"></div>
     </div>
     <div class="card">
@@ -179,20 +179,48 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 </div>
 
 <script>
-const GOAL = 30000000;
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-let ALL = [];
+const GOAL_GROWTH = 0.05; // 전년 대비 5% 목표
+let ALL = [];       // 26년 데이터
+let ALL25 = {};     // 25년 데이터 {name: months[]}
 let currentFilter = 'all';
 let currentRegion = 'all';
 let charts = {};
 
 function fmt(n){ return Math.round(n/10000).toLocaleString()+'만원'; }
-function fmtAxis(n){ 
-  if(n>=10000) return Math.round(n/10000).toLocaleString()+'억';
-  return n.toLocaleString()+'만';
+
+// 26년 데이터에서 마지막 데이터 월 인덱스 (0~11)
+function getLastMonthIdx(data){
+  // 전체 매장의 최대 유효 월 인덱스
+  let maxIdx = -1;
+  data.forEach(b=>{
+    for(let i=11;i>=0;i--){
+      if(b.months[i]>0){ if(i>maxIdx) maxIdx=i; break; }
+    }
+  });
+  return maxIdx;
 }
 
-// CSV 파싱
+// 매장의 마지막 유효 월 인덱스
+function branchLastIdx(b){
+  for(let i=11;i>=0;i--){ if(b.months[i]>0) return i; }
+  return -1;
+}
+
+// 25년 동일 월 매출 조회
+function get25(name, monthIdx){
+  const d = ALL25[name];
+  if(!d) return 0;
+  return d[monthIdx]||0;
+}
+
+// 전년 대비 목표값 (작년 동월 * 1.05)
+function getGoal(name, monthIdx){
+  const v25 = get25(name, monthIdx);
+  return v25 > 0 ? Math.round(v25 * (1 + GOAL_GROWTH)) : 0;
+}
+
+// CSV 파싱 (26년 데이터용)
 function parseCSV(text){
   const lines = text.trim().split('\n');
   const result = [];
@@ -206,8 +234,8 @@ function parseCSV(text){
       no: parseInt(cols[0])||i,
       manager: cols[1].trim(),
       name: cols[2].trim(),
-      months: months,
-      avg: Math.round(vals.reduce((s,v)=>s+v,0)/vals.length)
+      region: cols.length>15 ? cols[3].trim() : '기타',
+      months: months
     });
   }
   return result;
@@ -221,34 +249,26 @@ function filtered(){
 
 function setFilter(f){
   currentFilter=f;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  const activeTab = getTabEl(f);
-  if(activeTab) activeTab.classList.add('active');
+  document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.remove('active'));
+  const idx = window.__tabMgrs ? window.__tabMgrs.indexOf(f) : -1;
+  const el = idx>=0 ? document.getElementById('tab-'+idx) : null;
+  if(el) el.classList.add('active');
   render();
 }
 
 function renderTabs(){
   const mgrs=['all',...new Set(ALL.map(b=>b.manager))];
-  const labels={'all':'전체'};
   const el=document.getElementById('tabs');
   el.innerHTML=mgrs.map((m,i)=>{
-    const label=labels[m]||m.replace('임시매장(김혁)','김혁팀').replace('임시매장(민교)','민교팀');
+    const label=m==='all'?'전체':m;
     return `<div class="tab${m===currentFilter?' active':''}" id="tab-${i}" data-manager="${i}">${label}</div>`;
   }).join('');
-  // 탭 클릭 이벤트 — 담당자명에 공백/특수문자가 있어도 안전하게 처리
   window.__tabMgrs = mgrs;
   el.querySelectorAll('.tab').forEach(t=>{
-    t.addEventListener('click', function(){
-      const idx = parseInt(this.dataset.manager);
-      setFilter(window.__tabMgrs[idx]);
+    t.addEventListener('click',function(){
+      setFilter(window.__tabMgrs[parseInt(this.dataset.manager)]);
     });
   });
-}
-
-function getTabEl(f){
-  if(!window.__tabMgrs) return null;
-  const idx = window.__tabMgrs.indexOf(f);
-  return idx>=0 ? document.getElementById('tab-'+idx) : null;
 }
 
 function renderRegionTabs(){
@@ -269,92 +289,42 @@ function renderRegionTabs(){
   });
 }
 
-function renderRegionAvg(data){
-  const map={};
-  data.forEach(b=>{
-    if(!map[b.region]) map[b.region]={sum:0,cnt:0};
-    map[b.region].sum+=b.avg; map[b.region].cnt++;
-  });
-  const entries=Object.entries(map).sort((a,b)=>b[1].sum/b[1].cnt-a[1].sum/a[1].cnt);
-  const maxA=entries.length?entries[0][1].sum/entries[0][1].cnt:1;
-  const el=document.getElementById('regionList');
-  el.innerHTML=entries.map(([region,v])=>{
-    const avg=Math.round(v.sum/v.cnt);
-    const pct=Math.round(avg/maxA*100);
-    const col=avg>=30000000?'#3db87a':avg>=24000000?'#f0a04a':'#e05555';
-    return `<div style="margin-bottom:7px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-        <span style="font-size:10px;color:#c8dff0;">${region} <span style="color:#6b8fa8;font-size:9px;">${v.cnt}개점</span></span>
-        <span style="font-size:11px;font-weight:600;color:#e0f0ff;">${fmt(avg)}</span>
-      </div>
-      <div style="background:#1a2f44;border-radius:3px;height:4px;">
-        <div style="width:${pct}%;height:4px;border-radius:3px;background:${col};transition:width .8s;"></div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function renderBranches(){
-  const data=[...filtered()];
-  const sort=document.getElementById('sortSel').value;
-  if(sort==='avg_desc') data.sort((a,b)=>b.avg-a.avg);
-  else if(sort==='avg_asc') data.sort((a,b)=>a.avg-b.avg);
-  else if(sort==='no') data.sort((a,b)=>a.no-b.no);
-  else data.sort((a,b)=>a.name.localeCompare(b.name,'ko'));
-
-  const el=document.getElementById('branchList');
-  el.innerHTML=data.map((b,idx)=>{
-    const r=Math.round(b.avg/GOAL*100);
-    const cls=r>=100?'ok':r>=80?'wr':'fl';
-    const lbl=r>=100?'달성':'미달';
-    const bc=r>=100?'#3db87a':r>=80?'#f0a04a':'#e05555';
-    const fill=Math.min(r,130);
-    return `<div class="bi branch-item" data-idx="${idx}" style="cursor:pointer;" title="${b.name} 클릭 시 월별 상세 보기">
-      <div class="bh">
-        <span class="bn" title="${b.name}">${b.name}</span>
-        <div class="binfo">
-          <span class="badge ${cls}">${lbl} ${r}%</span>
-          <span class="bv">${fmt(b.avg)}</span>
-        </div>
-      </div>
-      <div class="bb"><div class="bf" style="width:${Math.min(fill,100)}%;background:${bc};"></div></div>
-    </div>`;
-  }).join('');
-  // 클릭 이벤트 — 현재 정렬된 data 배열 참조
-  window.__branchData = data;
-  el.querySelectorAll('.branch-item').forEach(item=>{
-    item.addEventListener('click',function(){
-      const b=window.__branchData[parseInt(this.dataset.idx)];
-      if(b) openBranchModal(b);
-    });
-    item.addEventListener('mouseenter',function(){ this.style.background='rgba(55,138,221,0.07)'; this.style.borderRadius='6px'; });
-    item.addEventListener('mouseleave',function(){ this.style.background=''; });
-  });
-}
-
 function destroyChart(key){
   if(charts[key]){ charts[key].destroy(); delete charts[key]; }
 }
 
+// 월별 합산 추이 차트: 25년 vs 26년 비교
 function renderTrend(data){
-  const sums=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
-  const active=sums.map((v,i)=>({v,i})).filter(x=>x.v>0);
+  const sums26=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
+  const active=sums26.map((v,i)=>({v,i})).filter(x=>x.v>0);
   if(!active.length) return;
   const labels=active.map(x=>MONTHS[x.i]);
-  const vals=active.map(x=>Math.round(x.v/10000)); // 만원 단위
-  const minVal=Math.min(...vals);
-  const maxVal=Math.max(...vals);
-  const padding=Math.round((maxVal-minVal)*0.2)||Math.round(minVal*0.1);
-  const yMin=Math.max(0, minVal-padding);
+  const vals26=active.map(x=>Math.round(x.v/10000));
+  // 25년: 같은 매장명만 합산
+  const vals25=active.map(x=>{
+    return data.reduce((s,b)=>{
+      const v=get25(b.name, x.i);
+      return s+v;
+    },0);
+  }).map(v=>Math.round(v/10000));
+  const allVals=[...vals26,...vals25.filter(v=>v>0)];
+  const minVal=Math.min(...allVals);
+  const maxVal=Math.max(...allVals);
+  const pad=Math.round((maxVal-minVal)*0.15)||Math.round(minVal*0.05)||1000;
+  const yMin=Math.max(0, minVal-pad);
   destroyChart('trend');
   charts.trend=new Chart(document.getElementById('trendChart'),{
     type:'line',
-    data:{labels,datasets:[{label:'합산매출(만원)',data:vals,
-      borderColor:'#378add',backgroundColor:'rgba(55,138,221,0.12)',
-      fill:true,tension:0.4,pointRadius:5,pointBackgroundColor:'#378add',
-      pointBorderColor:'#0d1b2a',pointBorderWidth:2}]},
+    data:{labels,datasets:[
+      {label:'26년',data:vals26,borderColor:'#378add',backgroundColor:'rgba(55,138,221,0.1)',
+        fill:true,tension:0.4,pointRadius:5,pointBackgroundColor:'#378add',pointBorderColor:'#0d1b2a',pointBorderWidth:2},
+      {label:'25년',data:vals25,borderColor:'#f0a04a',backgroundColor:'rgba(240,160,74,0.05)',
+        fill:true,tension:0.4,pointRadius:4,pointBackgroundColor:'#f0a04a',pointBorderColor:'#0d1b2a',pointBorderWidth:2,
+        borderDash:[4,3]}
+    ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y.toLocaleString()+'만원'}}},
+      plugins:{legend:{display:true,labels:{color:'#aac4e0',font:{size:11},boxWidth:14}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toLocaleString()+'만원'}}},
       scales:{x:{ticks:{color:'#6b8fa8',font:{size:11}},grid:{color:'#1a2f44'}},
         y:{min:yMin,ticks:{color:'#6b8fa8',font:{size:11},callback:v=>{
           if(v>=10000) return (v/10000).toFixed(1)+'억';
@@ -363,17 +333,22 @@ function renderTrend(data){
   });
 }
 
-function renderDist(data){
-  const avgs=data.map(b=>b.avg);
+// 달성률 분포: 마지막 월 vs 전년 대비 5% 목표 기준
+function renderDist(data, lastIdx){
+  const vals=data.map(b=>{
+    const cur=b.months[lastIdx]||0;
+    const goal=getGoal(b.name, lastIdx);
+    return goal>0 ? cur/goal : (cur>0?1:0);
+  });
   const buckets=[
-    {label:'~1,500만',max:15000000,color:'#a32d2d'},
-    {label:'1500~2000만',max:20000000,color:'#854f0b'},
-    {label:'2000~2500만',max:25000000,color:'#185fa5'},
-    {label:'2500~3000만',max:30000000,color:'#0f6e56'},
-    {label:'3000만~',max:Infinity,color:'#3db87a'},
+    {label:'~70%',max:0.7,color:'#a32d2d'},
+    {label:'70~90%',max:0.9,color:'#854f0b'},
+    {label:'90~100%',max:1.0,color:'#185fa5'},
+    {label:'100~110%',max:1.1,color:'#0f6e56'},
+    {label:'110%~',max:Infinity,color:'#3db87a'},
   ];
   let prev=0;
-  const counts=buckets.map(b=>{const c=avgs.filter(v=>v>=prev&&v<b.max).length;prev=b.max;return c;});
+  const counts=buckets.map(b=>{const c=vals.filter(v=>v>=prev&&v<b.max).length;prev=b.max;return c;});
   destroyChart('dist');
   charts.dist=new Chart(document.getElementById('distChart'),{
     type:'bar',
@@ -386,6 +361,7 @@ function renderDist(data){
   });
 }
 
+// 월별 증감률 (26년 기준)
 function renderGrow(data){
   const sums=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
   const active=sums.map((v,i)=>({v,i})).filter(x=>x.v>0);
@@ -407,13 +383,16 @@ function renderGrow(data){
   });
 }
 
-function renderPie(data){
-  const top=[...data].sort((a,b)=>b.avg-a.avg).slice(0,15);
-  const maxVal=top[0]?top[0].avg:1;
+// 순위: 마지막 월 실매출 기준
+function renderPie(data, lastIdx){
+  const withVal=data.map(b=>({...b,lastVal:b.months[lastIdx]||0})).filter(b=>b.lastVal>0);
+  const top=[...withVal].sort((a,b)=>b.lastVal-a.lastVal).slice(0,15);
+  const maxVal=top[0]?top[0].lastVal:1;
   const el=document.getElementById('rankList');
   el.innerHTML=top.map((b,i)=>{
-    const pct=Math.round(b.avg/maxVal*100);
-    const ac=b.avg>=GOAL?'#3db87a':b.avg>=GOAL*0.8?'#f0a04a':'#e05555';
+    const goal=getGoal(b.name, lastIdx);
+    const pct=Math.round(b.lastVal/maxVal*100);
+    const ac=goal>0?(b.lastVal>=goal?'#3db87a':b.lastVal>=goal*0.9?'#f0a04a':'#e05555'):'#378add';
     const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`<span style="color:#6b8fa8;font-size:10px;">${i+1}</span>`;
     return `<div style="margin-bottom:6px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
@@ -421,7 +400,7 @@ function renderPie(data){
           <span style="width:16px;text-align:center;font-size:11px;">${medal}</span>
           <span style="font-size:10px;color:#c8dff0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;">${b.name}</span>
         </div>
-        <span style="font-size:11px;font-weight:600;color:#e0f0ff;">${fmt(b.avg)}</span>
+        <span style="font-size:11px;font-weight:600;color:#e0f0ff;">${fmt(b.lastVal)}</span>
       </div>
       <div style="background:#1a2f44;border-radius:3px;height:4px;">
         <div style="width:${pct}%;height:4px;border-radius:3px;background:${ac};transition:width .8s ease;"></div>
@@ -430,12 +409,14 @@ function renderPie(data){
   }).join('');
 }
 
-function renderMgr(data){
+function renderMgr(data, lastIdx){
   const mgrs={};
   data.forEach(b=>{
     const k=b.manager;
+    const v=b.months[lastIdx]||0;
+    if(v<=0) return;
     if(!mgrs[k]) mgrs[k]={sum:0,cnt:0};
-    mgrs[k].sum+=b.avg; mgrs[k].cnt++;
+    mgrs[k].sum+=v; mgrs[k].cnt++;
   });
   const entries=Object.entries(mgrs).sort((a,b)=>b[1].sum/b[1].cnt-a[1].sum/a[1].cnt);
   const maxAvg=Math.max(...entries.map(([,v])=>v.sum/v.cnt));
@@ -443,100 +424,213 @@ function renderMgr(data){
   el.innerHTML=entries.map(([k,v])=>{
     const a=Math.round(v.sum/v.cnt);
     const pct=Math.round(a/maxAvg*100);
-    const cls=a>=GOAL?'pos':'neg';
-    const label=k.replace('임시매장(김혁)','김혁팀').replace('임시매장(민교)','민교팀');
+    const cls=a>=30000000?'pos':'neg';
     return `<div class="mgr-card">
-      <div class="mgr-name">${label}</div>
+      <div class="mgr-name">${k}</div>
       <div class="mgr-row"><span class="mgr-val ${cls}">${fmt(a)}</span><span class="mgr-cnt">${v.cnt}개점</span></div>
       <div class="mgr-bar"><div class="mgr-bf" style="width:${pct}%;"></div></div>
     </div>`;
   }).join('');
 }
 
+function renderRegionAvg(data, lastIdx){
+  const map={};
+  data.forEach(b=>{
+    const v=b.months[lastIdx]||0;
+    if(v<=0) return;
+    if(!map[b.region]) map[b.region]={sum:0,cnt:0};
+    map[b.region].sum+=v; map[b.region].cnt++;
+  });
+  const entries=Object.entries(map).sort((a,b)=>b[1].sum/b[1].cnt-a[1].sum/a[1].cnt);
+  const maxA=entries.length?entries[0][1].sum/entries[0][1].cnt:1;
+  const el=document.getElementById('regionList');
+  el.innerHTML=entries.map(([region,v])=>{
+    const avg=Math.round(v.sum/v.cnt);
+    const pct=Math.round(avg/maxA*100);
+    const col=avg>=30000000?'#3db87a':avg>=24000000?'#f0a04a':'#e05555';
+    return `<div style="margin-bottom:7px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+        <span style="font-size:10px;color:#c8dff0;">${region} <span style="color:#6b8fa8;font-size:9px;">${v.cnt}개점</span></span>
+        <span style="font-size:11px;font-weight:600;color:#e0f0ff;">${fmt(avg)}</span>
+      </div>
+      <div style="background:#1a2f44;border-radius:3px;height:4px;">
+        <div style="width:${pct}%;height:4px;border-radius:3px;background:${col};transition:width .8s;"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 매장 리스트: 마지막 월 매출 vs 전년 동월 대비 5% 목표
+function renderBranches(lastIdx){
+  const data=[...filtered()];
+  const sort=document.getElementById('sortSel').value;
+  if(sort==='avg_desc') data.sort((a,b)=>(b.months[lastIdx]||0)-(a.months[lastIdx]||0));
+  else if(sort==='avg_asc') data.sort((a,b)=>(a.months[lastIdx]||0)-(b.months[lastIdx]||0));
+  else if(sort==='no') data.sort((a,b)=>a.no-b.no);
+  else data.sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+
+  const monthLabel=MONTHS[lastIdx];
+  document.getElementById('branchListTitle').textContent=`매장별 ${monthLabel} 매출 · 전년 대비 5%↑ 목표`;
+  const el=document.getElementById('branchList');
+  el.innerHTML=data.map((b,idx)=>{
+    const cur=b.months[lastIdx]||0;
+    const goal=getGoal(b.name, lastIdx);
+    const v25=get25(b.name, lastIdx);
+    let r=0, cls='fl', lbl='목표없음', bc='#6b8fa8';
+    if(goal>0){
+      r=Math.round(cur/goal*100);
+      cls=r>=100?'ok':r>=90?'wr':'fl';
+      lbl=r>=100?'달성':'미달';
+      bc=r>=100?'#3db87a':r>=90?'#f0a04a':'#e05555';
+    }
+    const fill=Math.min(r||Math.min(100,Math.round(cur/30000000*100)),130);
+    const yoyStr=v25>0?((cur-v25)/v25*100).toFixed(1)+'%':'-';
+    const yoyCls=v25>0&&cur>=v25?'pos':'neg';
+    return `<div class="bi branch-item" data-idx="${idx}" style="cursor:pointer;" title="${b.name} 클릭 시 월별 상세 보기">
+      <div class="bh">
+        <span class="bn" title="${b.name}">${b.name}</span>
+        <div class="binfo">
+          <span class="badge ${cls}">${lbl}${goal>0?' '+r+'%':''}</span>
+          <span class="bv">${fmt(cur)}</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span style="font-size:9px;color:#6b8fa8;">목표: ${goal>0?fmt(goal):'-'} · 전년동월: ${v25>0?fmt(v25):'-'}</span>
+        <span style="font-size:9px;" class="${yoyCls}">전년비 ${yoyStr}</span>
+      </div>
+      <div class="bb"><div class="bf" style="width:${Math.min(fill,100)}%;background:${bc};"></div></div>
+    </div>`;
+  }).join('');
+  window.__branchData = data;
+  el.querySelectorAll('.branch-item').forEach(item=>{
+    item.addEventListener('click',function(){
+      const b=window.__branchData[parseInt(this.dataset.idx)];
+      if(b) openBranchModal(b);
+    });
+    item.addEventListener('mouseenter',function(){ this.style.background='rgba(55,138,221,0.07)'; this.style.borderRadius='6px'; });
+    item.addEventListener('mouseleave',function(){ this.style.background=''; });
+  });
+}
+
 function render(){
   const data=filtered();
   if(!data.length) return;
+  const lastIdx=getLastMonthIdx(data);
+  if(lastIdx<0) return;
+  const monthLabel=MONTHS[lastIdx];
 
-  // 평균 매출 계산 (데이터 있는 월만)
-  const avgVal=data.reduce((s,b)=>s+b.avg,0)/data.length;
-  const over=data.filter(b=>b.avg>=GOAL).length;
-  const top=data.reduce((a,b)=>b.avg>a.avg?b:a,data[0]);
+  // KPI 계산: 마지막 월 기준
+  const curVals=data.map(b=>b.months[lastIdx]||0).filter(v=>v>0);
+  const avgVal=curVals.length?curVals.reduce((s,v)=>s+v,0)/curVals.length:0;
+
+  // 전년 대비 5% 목표 달성 수
+  const over=data.filter(b=>{
+    const cur=b.months[lastIdx]||0;
+    const goal=getGoal(b.name,lastIdx);
+    return goal>0&&cur>=goal;
+  }).length;
+  const hasGoal=data.filter(b=>getGoal(b.name,lastIdx)>0).length;
 
   // 전월 대비
-  const sums=MONTHS.map((_,i)=>data.reduce((s,b)=>s+(b.months[i]||0),0));
-  const activeM=sums.map((v,i)=>({v,i})).filter(x=>x.v>0);
-  let growStr='-', growCls='';
-  if(activeM.length>=2){
-    const prev=activeM[activeM.length-2],cur=activeM[activeM.length-1];
-    const g=((cur.v-prev.v)/prev.v*100).toFixed(1);
-    growStr=(g>0?'+':'')+g+'%';
-    growCls=g>=0?'pos':'neg';
+  const prevIdx=lastIdx>0?lastIdx-1:-1;
+  let growStr='-',growCls='';
+  if(prevIdx>=0){
+    const sumCur=data.reduce((s,b)=>s+(b.months[lastIdx]||0),0);
+    const sumPrev=data.reduce((s,b)=>s+(b.months[prevIdx]||0),0);
+    if(sumPrev>0){
+      const g=((sumCur-sumPrev)/sumPrev*100).toFixed(1);
+      growStr=(g>0?'+':'')+g+'%';
+      growCls=parseFloat(g)>=0?'pos':'neg';
+    }
   }
+
+  // 최고 매출 매장: 26년 전체 기간 중 가장 높은 단일 월 실매출
+  let topBranch=null, topVal=0, topMonthLabel='';
+  ALL.forEach(b=>{
+    b.months.forEach((v,i)=>{
+      if(v>topVal){topVal=v;topBranch=b;topMonthLabel=MONTHS[i];}
+    });
+  });
 
   document.getElementById('k1').textContent=data.length+'개';
   document.getElementById('k1s').textContent='전체 '+ALL.length+'개 중';
+  document.getElementById('k2l').textContent=monthLabel+' 평균 매출';
   document.getElementById('k2').textContent=fmt(avgVal);
-  const d2=((avgVal-GOAL)/GOAL*100).toFixed(1);
-  document.getElementById('k2s').className='ks '+(avgVal>=GOAL?'pos':'neg');
-  document.getElementById('k2s').textContent='목표 대비 '+(d2>0?'+':'')+d2+'%';
-  document.getElementById('k3').textContent=over+'개 ('+Math.round(over/data.length*100)+'%)';
-  document.getElementById('k3s').className='ks '+(over/data.length>=0.5?'pos':'warn');
-  document.getElementById('k3s').textContent='미달 '+(data.length-over)+'개';
+  const avgGoal=data.reduce((s,b)=>s+getGoal(b.name,lastIdx),0)/data.length;
+  const d2=avgGoal>0?((avgVal-avgGoal)/avgGoal*100).toFixed(1):null;
+  document.getElementById('k2s').className='ks '+(d2!==null&&parseFloat(d2)>=0?'pos':'neg');
+  document.getElementById('k2s').textContent=d2!==null?`목표 대비 ${parseFloat(d2)>=0?'+':''}${d2}%`:'';
+  document.getElementById('k3l').textContent=`${monthLabel} 전년비 5%↑ 목표 달성`;
+  document.getElementById('k3').textContent=`${over}개 (${hasGoal>0?Math.round(over/hasGoal*100):0}%)`;
+  document.getElementById('k3s').className='ks '+(over/Math.max(hasGoal,1)>=0.5?'pos':'warn');
+  document.getElementById('k3s').textContent='미달 '+(hasGoal-over)+'개';
   document.getElementById('k4').textContent=growStr;
   document.getElementById('k4').className='kv '+(growStr.startsWith('+')?'pos':growStr==='-'?'':'neg');
-  document.getElementById('k4s').textContent=activeM.length>=2?MONTHS[activeM[activeM.length-2].i]+'→'+MONTHS[activeM[activeM.length-1].i]:'';
-  document.getElementById('k5').textContent=fmt(top.avg);
-  document.getElementById('k5s').textContent=top.name;
+  document.getElementById('k4s').textContent=prevIdx>=0?MONTHS[prevIdx]+'→'+monthLabel:'';
+  if(topBranch){
+    document.getElementById('k5').textContent=fmt(topVal);
+    document.getElementById('k5s').textContent=topBranch.name+' · 26년 '+topMonthLabel;
+  }
 
-  renderBranches();
+  renderBranches(lastIdx);
   renderTrend(data);
-  renderDist(data);
+  renderDist(data, lastIdx);
   renderGrow(data);
-  renderPie(data);
-  renderMgr(data);
-  renderRegionAvg(data);
-  // 왼쪽 매장 리스트 높이를 오른쪽 카드에 맞춤
+  renderPie(data, lastIdx);
+  renderMgr(data, lastIdx);
+  renderRegionAvg(data, lastIdx);
+  document.getElementById('distTitle').textContent=`달성률 구간 (${monthLabel} 기준)`;
+  document.getElementById('rankTitle').textContent=`${monthLabel} 매출 순위 (상위 15개)`;
+
   requestAnimationFrame(()=>{
-    const rightCard = document.querySelector('.main-grid .card:nth-child(2)');
-    const branchScroll = document.getElementById('branchList');
-    if(rightCard && branchScroll){
-      const rightH = rightCard.getBoundingClientRect().height;
-      const titleH = branchScroll.previousElementSibling ? branchScroll.previousElementSibling.getBoundingClientRect().height : 40;
-      branchScroll.style.maxHeight = (rightH - titleH - 28) + 'px';
+    const rightCard=document.querySelector('.main-grid .card:nth-child(2)');
+    const branchScroll=document.getElementById('branchList');
+    if(rightCard&&branchScroll){
+      const rightH=rightCard.getBoundingClientRect().height;
+      const titleEl=branchScroll.previousElementSibling;
+      const titleH=titleEl?titleEl.getBoundingClientRect().height+10:40;
+      branchScroll.style.maxHeight=(rightH-titleH-40)+'px';
     }
   });
 }
 
-let modalChartInst = null;
+// 매장 모달: 25년 vs 26년 월별 비교 + 5% 목표선
+let modalChartInst=null;
 function openBranchModal(b){
-  const active = b.months.map((v,i)=>({v,i})).filter(x=>x.v>0);
-  if(!active.length) return;
-  const labels = active.map(x=>MONTHS[x.i]);
-  const vals = active.map(x=>Math.round(x.v/10000));
-  const minVal = Math.min(...vals);
-  const maxVal = Math.max(...vals);
-  const padding = Math.round((maxVal-minVal)*0.25)||Math.round(minVal*0.1)||100;
-  const yMin = Math.max(0, minVal-padding);
-  const goal = Math.round(GOAL/10000);
+  const active26=b.months.map((v,i)=>({v,i})).filter(x=>x.v>0);
+  if(!active26.length) return;
+  const d25=ALL25[b.name]||null;
+  const labels=MONTHS; // 전체 12개월
+  const vals26=b.months.map(v=>v>0?Math.round(v/10000):null);
+  const vals25=d25?d25.map(v=>v>0?Math.round(v/10000):null):null;
+  const goals=d25?d25.map(v=>v>0?Math.round(v*(1+GOAL_GROWTH)/10000):null):null;
 
-  document.getElementById('modalTitle').textContent = b.name + ' — 월별 매출';
-  document.getElementById('modalSub').textContent = b.manager + ' · 평균 ' + fmt(b.avg) + ' · 목표 달성률 ' + Math.round(b.avg/GOAL*100) + '%';
+  const allVals=[...vals26,...(vals25||[]),...(goals||[])].filter(v=>v!=null&&v>0);
+  const minV=allVals.length?Math.min(...allVals):0;
+  const maxV=allVals.length?Math.max(...allVals):1;
+  const pad=Math.round((maxV-minV)*0.2)||100;
+
+  document.getElementById('modalTitle').textContent=b.name+' — 월별 매출 비교 (25년 vs 26년)';
+  document.getElementById('modalSub').textContent=b.manager+' · '+b.region+' · 목표: 전년 동월 대비 5%↑';
   document.getElementById('branchModal').classList.add('open');
 
-  if(modalChartInst){ modalChartInst.destroy(); modalChartInst=null; }
-  const colors = vals.map(v=>v>=goal?'rgba(61,184,122,0.85)':v>=goal*0.8?'rgba(240,160,74,0.85)':'rgba(224,85,85,0.85)');
-  modalChartInst = new Chart(document.getElementById('modalChart'),{
+  if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
+  const datasets=[
+    {type:'bar',label:'26년',data:vals26,backgroundColor:'rgba(55,138,221,0.8)',borderRadius:4,order:3},
+  ];
+  if(vals25) datasets.push({type:'line',label:'25년',data:vals25,borderColor:'#f0a04a',
+    pointRadius:3,borderWidth:2,fill:false,borderDash:[4,3],order:2});
+  if(goals) datasets.push({type:'line',label:'목표(전년+5%)',data:goals,borderColor:'#3db87a',
+    pointRadius:0,borderWidth:1.5,fill:false,borderDash:[2,2],order:1});
+
+  modalChartInst=new Chart(document.getElementById('modalChart'),{
     type:'bar',
-    data:{labels,datasets:[
-      {type:'bar',label:'월매출',data:vals,backgroundColor:colors,borderRadius:5,order:2},
-      {type:'line',label:'목표',data:labels.map(()=>goal),borderColor:'rgba(255,255,255,0.3)',
-        borderDash:[4,3],pointRadius:0,borderWidth:1.5,fill:false,order:1}
-    ]},
+    data:{labels,datasets},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:true,labels:{color:'#6b8fa8',font:{size:10},boxWidth:12}},
-        tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toLocaleString()+'만원'}}},
-      scales:{x:{ticks:{color:'#6b8fa8',font:{size:11}},grid:{color:'#1a2f44'}},
-        y:{min:yMin,ticks:{color:'#6b8fa8',font:{size:10},callback:v=>{
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y!=null?c.parsed.y.toLocaleString()+'만원':'없음')}}},
+      scales:{x:{ticks:{color:'#6b8fa8',font:{size:10}},grid:{color:'#1a2f44'}},
+        y:{min:Math.max(0,minV-pad),ticks:{color:'#6b8fa8',font:{size:10},callback:v=>{
           if(v>=10000) return (v/10000).toFixed(1)+'억';
           return v.toLocaleString()+'만';
         }},grid:{color:'#1a2f44'}}}}
@@ -545,24 +639,25 @@ function openBranchModal(b){
 
 function closeModal(){
   document.getElementById('branchModal').classList.remove('open');
-  if(modalChartInst){ modalChartInst.destroy(); modalChartInst=null; }
+  if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
 }
 document.getElementById('branchModal').addEventListener('click',function(e){
   if(e.target===this) closeModal();
 });
 
 function loadCSV(text, filename){
-  ALL=parseCSV(text);
-  if(!ALL.length){ alert('CSV 파싱 실패: 형식을 확인해 주세요.'); return; }
+  const parsed=parseCSV(text);
+  if(!parsed.length){ alert('CSV 파싱 실패'); return; }
+  ALL=parsed;
   currentFilter='all';
   renderTabs();
+  renderRegionTabs();
   render();
   const now=new Date();
   document.getElementById('lastUpdate').textContent=
     `${filename} · ${now.toLocaleDateString('ko-KR')} ${now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 업데이트`;
 }
 
-// 파일 업로드
 document.getElementById('fileInput').addEventListener('change',function(e){
   const file=e.target.files[0];
   if(!file) return;
@@ -572,26 +667,22 @@ document.getElementById('fileInput').addEventListener('change',function(e){
   e.target.value='';
 });
 
-// 내장 데이터 초기 로드 (sales_data.csv 기준 2025년 데이터)
+// ===== 내장 데이터 =====
 (function(){
-  const embeddedData = [{"no": 1, "manager": "임시매장", "name": "부산명지점", "region": "부산", "months": [23560003.2, 20358308.0, 24963328.0, 22837280.0, 24681106.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 2, "manager": "김태환 과장", "name": "여수웅천점", "region": "전남", "months": [11860568.0, 11898288.0, 17382680.0, 13116120.0, 14534480.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 3, "manager": "강동우 사원", "name": "파주금촌점", "region": "경기", "months": [16119620.0, 16262200.0, 21150380.0, 21956900.0, 18972040.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 4, "manager": "김태환 과장", "name": "안산본점", "region": "경기", "months": [17854588.0, 27370655.0, 18656000.0, 17160696.0, 23221920.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 5, "manager": "임도형 과장", "name": "김천점", "region": "경북", "months": [9857968.0, 8062650.0, 10181526.0, 14606500.0, 10311536.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 6, "manager": "이중섭 대리", "name": "인천가좌점", "region": "인천", "months": [29312276.0, 28755404.0, 24366800.0, 24764720.0, 26129588.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 7, "manager": "김태환 과장", "name": "안산중앙점", "region": "경기", "months": [36855433.0, 34266091.4, 37048569.0, 34710214.0, 40907824.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 8, "manager": "이중섭 대리", "name": "대전직영본점", "region": "대전", "months": [35125972.0, 40965536.0, 37532715.0, 32833116.0, 33590732.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 9, "manager": "강동우 사원", "name": "다산점", "region": "경기", "months": [16683684.0, 18060984.0, 21213080.0, 22047720.0, 25833596.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 10, "manager": "임시매장", "name": "수원천천점", "region": "경기", "months": [18326296.0, 22868172.0, 25190040.0, 21792480.0, 23222516.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 11, "manager": "이중섭 대리", "name": "인천송도점", "region": "인천", "months": [22119744.0, 16066398.0, 21026180.0, 16562784.0, 20116336.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 12, "manager": "이중섭 대리", "name": "당하점", "region": "인천", "months": [22745141.6, 25046442.4, 18124920.0, 24643476.0, 19720856.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 13, "manager": "이중섭 대리", "name": "김포구래점", "region": "경기", "months": [17330720.0, 19178808.0, 20653876.0, 20469874.0, 22148828.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 14, "manager": "김태환 과장", "name": "광주첨단점", "region": "광주", "months": [21771344.0, 24532520.0, 24588980.0, 20445270.0, 20435410.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 15, "manager": "강동우 사원", "name": "부천중동점", "region": "경기", "months": [26139986.0, 29824430.0, 33824540.0, 26931548.0, 31577026.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 16, "manager": "이중섭 대리", "name": "인천구월점", "region": "인천", "months": [28753232.0, 24517716.0, 26804372.0, 28334264.0, 26589980.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 17, "manager": "이중섭 대리", "name": "광명점", "region": "경기", "months": [23901404.0, 20706980.0, 26620652.0, 26303016.0, 28476976.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 18, "manager": "강동우 사원", "name": "양주옥정점", "region": "경기", "months": [20115500.0, 30540228.0, 23098388.0, 19493584.0, 25707988.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 19, "manager": "강동우 사원", "name": "부천옥길점", "region": "경기", "months": [11579438.0, 15128856.4, 16088500.0, 14189924.0, 15796008.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 20, "manager": "임시매장", "name": "하남시청역점", "region": "경기", "months": [19419656.0, 23238680.0, 22871748.0, 19702200.0, 37194600.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 21, "manager": "김태환 과장", "name": "조치원점", "region": "세종", "months": [5895600.0, 4856500.0, 3932776.0, 4255600.0, 4901660.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 22, "manager": "임도형 과장", "name": "안양평촌점", "region": "경기", "months": [20506004.0, 24468460.0, 24079848.0, 22978560.0, 28358660.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 23, "manager": "박영태 대리", "name": "과천점", "region": "경기", "months": [27115773.6, 29238148.0, 26769436.0, 26794160.0, 28074820.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 24, "manager": "강동우 사원", "name": "은평역촌점", "region": "서울", "months": [28584364.0, 33093638.0, 32562408.0, 29841564.0, 32048768.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 25, "manager": "강동우 사원", "name": "노원하계점", "region": "서울", "months": [22115402.0, 20423884.0, 24707438.0, 21828296.0, 24785844.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 26, "manager": "이중섭 대리", "name": "부평청천점", "region": "인천", "months": [14417132.0, 19058560.0, 20367120.0, 16791720.0, 15150272.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 27, "manager": "임도형 과장", "name": "동탄목동점", "region": "경기", "months": [15983247.2, 19020320.0, 16785780.0, 22646360.0, 19374844.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 28, "manager": "이중섭 대리", "name": "용현SK점", "region": "인천", "months": [18292528.0, 24724364.0, 20294048.0, 23153644.0, 21889100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 29, "manager": "이중섭 대리", "name": "김포풍무점", "region": "경기", "months": [12840744.0, 17716048.0, 12545468.0, 10967240.0, 11409516.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 30, "manager": "김태환 과장", "name": "세종나성점", "region": "세종", "months": [19384236.0, 16131488.0, 17906432.0, 17118668.0, 17941700.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 31, "manager": "김태환 과장", "name": "청주동남지구점", "region": "충북", "months": [29123557.6, 24347988.0, 27990240.0, 27238196.0, 28978868.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 32, "manager": "임시매장", "name": "용호빌리브점", "region": "부산", "months": [10197600.0, 9751000.0, 14310466.0, 20998216.0, 15576720.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 33, "manager": "임도형 과장", "name": "아산풍기점", "region": "충남", "months": [15254036.0, 18890668.0, 19691936.0, 16936480.0, 18012488.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 34, "manager": "이중섭 대리", "name": "충주점", "region": "충북", "months": [33019936.0, 22367288.0, 27718600.0, 24642500.0, 27665896.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 35, "manager": "이중섭 대리", "name": "연수동춘점", "region": "인천", "months": [6673240.0, 16850846.0, 13865538.0, 15563690.0, 17418196.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 36, "manager": "박영태 대리", "name": "마곡역점", "region": "서울", "months": [28255216.0, 45665596.0, 26315660.0, 24901788.0, 25480076.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 37, "manager": "임시매장", "name": "광교점", "region": "경기", "months": [26424412.0, 29089372.0, 28594884.0, 26169272.0, 26001264.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 38, "manager": "이중섭 대리", "name": "계산점", "region": "인천", "months": [24374220.0, 26372483.2, 24971760.0, 21714740.0, 25182204.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 39, "manager": "이중섭 대리", "name": "청라점", "region": "인천", "months": [22758440.0, 36128332.0, 33717218.0, 18944754.0, 26508752.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 40, "manager": "임도형 과장", "name": "군포산본점", "region": "경기", "months": [19399574.0, 18500244.4, 20222796.0, 18689428.0, 15530300.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 41, "manager": "박영태 대리", "name": "분당서현점", "region": "경기", "months": [37089184.0, 36247932.8, 30942516.0, 33989284.0, 34101128.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 42, "manager": "이중섭 대리", "name": "전주에코시티점", "region": "전북", "months": [26267932.0, 32573996.0, 40376840.0, 29622422.4, 34329196.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 43, "manager": "강동우 사원", "name": "삼각산점", "region": "서울", "months": [20074720.0, 25558000.0, 25907932.0, 21830749.36, 21390476.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 44, "manager": "이중섭 대리", "name": "영종하늘도시점", "region": "인천", "months": [19950828.0, 21087044.0, 25050704.0, 21910390.0, 26446380.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 45, "manager": "이중섭 대리", "name": "서창점", "region": "인천", "months": [13992176.0, 21914992.0, 19124139.2, 16950316.0, 21845728.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 46, "manager": "임시매장", "name": "수원망포점", "region": "경기", "months": [23654268.0, 30128002.0, 25549912.0, 21525328.0, 23522276.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 47, "manager": "임도형 과장", "name": "동탄능동점", "region": "경기", "months": [23862024.0, 22747916.0, 17677960.0, 18468092.0, 23881140.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 48, "manager": "임도형 과장", "name": "안성공도점", "region": "경기", "months": [11932196.0, 13577368.0, 15102720.0, 12622356.0, 14254380.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 49, "manager": "임도형 과장", "name": "침산점", "region": "대구", "months": [25418884.0, 30643492.0, 22390220.0, 24648506.0, 29458094.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 50, "manager": "임시매장", "name": "송파위례점", "region": "서울", "months": [26294308.0, 23667134.0, 27695802.0, 22765532.0, 26192498.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 51, "manager": "김태환 과장", "name": "광주수완점", "region": "광주", "months": [37901840.0, 39988648.8, 44984868.0, 39883640.0, 37538784.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 52, "manager": "임시매장", "name": "부산화명점", "region": "부산", "months": [36879198.4, 37378420.0, 34963380.0, 31452224.0, 39895584.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 53, "manager": "이중섭 대리", "name": "검단신도시점", "region": "인천", "months": [24294028.0, 30857944.0, 30300616.0, 28525478.0, 35305276.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 54, "manager": "임시매장", "name": "강동상일점", "region": "서울", "months": [18703257.6, 24133326.4, 28749836.0, 26319636.0, 26131316.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 55, "manager": "임도형 과장", "name": "비전점", "region": "경기", "months": [20929160.0, 21534100.0, 25159048.0, 18817300.0, 28867056.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 56, "manager": "박영태 대리", "name": "용인역북점", "region": "경기", "months": [18596024.0, 18890012.0, 22034964.0, 16499468.0, 21556520.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 57, "manager": "이중섭 대리", "name": "익산영등점", "region": "전북", "months": [22951476.0, 17399800.0, 23500476.0, 20723336.0, 19626696.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 58, "manager": "박영태 대리", "name": "광화문점", "region": "서울", "months": [50755050.0, 44457350.0, 44266750.0, 49072150.0, 66938198.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 59, "manager": "박영태 대리", "name": "영등포시장점", "region": "서울", "months": [27541288.0, 31758006.0, 25437124.0, 27250778.0, 28519280.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 60, "manager": "박영태 대리", "name": "신용산점", "region": "서울", "months": [40496152.0, 39201380.0, 39208263.6, 34202744.0, 34650208.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 61, "manager": "박영태 대리", "name": "수지구청역점", "region": "경기", "months": [39695032.0, 35470500.0, 34385844.0, 35000064.0, 36870720.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 62, "manager": "김태환 과장", "name": "청주율량점", "region": "충북", "months": [19742212.0, 20648390.0, 19016610.0, 17281900.0, 18028940.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 63, "manager": "김태환 과장", "name": "광주진월점", "region": "광주", "months": [29137420.0, 24393360.0, 24399608.0, 26564820.0, 24057600.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 64, "manager": "김태환 과장", "name": "청주터미널점", "region": "충북", "months": [25981428.0, 26983540.0, 26476324.0, 25383764.0, 31950436.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 65, "manager": "강동우 사원", "name": "일산킨텍스점", "region": "경기", "months": [17546980.0, 23399924.0, 27318500.0, 23735078.0, 25213040.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 66, "manager": "강동우 사원", "name": "시흥목감점", "region": "경기", "months": [15066880.0, 16153480.0, 17322120.0, 16058120.0, 14264820.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 67, "manager": "박영태 대리", "name": "강남논현점", "region": "서울", "months": [18929360.0, 30173656.0, 35797273.0, 16824890.0, 18587105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 68, "manager": "임도형 과장", "name": "당진점", "region": "충남", "months": [11194300.0, 16770720.0, 15196740.0, 12768888.0, 13961664.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 69, "manager": "임시매장", "name": "문정점", "region": "서울", "months": [24012088.0, 23612940.0, 27034516.0, 26727144.0, 22951918.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 70, "manager": "임도형 과장", "name": "대구월성점", "region": "대구", "months": [17536528.0, 24693220.0, 20348404.0, 22786240.0, 19931084.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 71, "manager": "임시매장", "name": "양산범어점", "region": "경남", "months": [18039076.0, 18151860.0, 17767592.0, 18886820.0, 17518896.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 72, "manager": "이중섭 대리", "name": "동해이도점", "region": "강원", "months": [23235196.0, 27108670.0, 36222148.0, 21544520.0, 26982248.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 73, "manager": "김태환 과장", "name": "남악점", "region": "전남", "months": [21934580.0, 18677460.0, 25433594.0, 18480640.0, 16690608.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 74, "manager": "임시매장", "name": "미사역점", "region": "경기", "months": [23413020.0, 23413020.0, 23413020.0, 26454608.0, 24713576.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 75, "manager": "박영태 대리", "name": "용인동백점", "region": "경기", "months": [25186812.0, 22488232.0, 25811708.0, 24742440.0, 23408028.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 76, "manager": "김태환 과장", "name": "상록수역점", "region": "경기", "months": [16855800.0, 19182830.4, 16832562.4, 15516968.0, 18147280.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 77, "manager": "이중섭 대리", "name": "김포장기점", "region": "경기", "months": [25701104.0, 27841548.0, 24385764.0, 25638952.0, 30253992.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 78, "manager": "임시매장", "name": "경남대점", "region": "경남", "months": [25317310.0, 16976292.0, 16679724.0, 13497948.0, 16164381.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 79, "manager": "임시매장", "name": "거제수월점", "region": "경남", "months": [32173514.0, 34523894.0, 23301504.0, 22586980.0, 24762060.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 80, "manager": "임도형 과장", "name": "포항양덕점", "region": "경북", "months": [25518184.0, 24776016.0, 28420220.0, 25768448.0, 25604440.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 81, "manager": "임도형 과장", "name": "대구칠곡점", "region": "대구", "months": [27646500.0, 32234872.0, 23372564.0, 30062864.0, 28176032.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 82, "manager": "임시매장", "name": "잠실스타파크점", "region": "서울", "months": [18273964.0, 27438880.0, 21057924.0, 18843120.0, 14347096.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 83, "manager": "임도형 과장", "name": "안양비산점", "region": "경기", "months": [37826752.0, 37178070.4, 28450464.4, 32018966.0, 32702856.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 84, "manager": "박영태 대리", "name": "목동파리공원점", "region": "서울", "months": [18606228.0, 21114548.0, 20028456.0, 23146036.0, 23302872.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 85, "manager": "강동우 사원", "name": "삼송점", "region": "경기", "months": [16755836.0, 23802280.0, 18858944.0, 19458820.0, 18894104.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 86, "manager": "박영태 대리", "name": "공덕점", "region": "서울", "months": [32073444.0, 33451290.4, 29237141.6, 35038952.0, 29536605.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 87, "manager": "이중섭 대리", "name": "전주혁신도시점", "region": "전북", "months": [15629644.0, 18848060.0, 17683976.0, 18758668.0, 16139032.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 88, "manager": "강동우 사원", "name": "의정부민락점", "region": "경기", "months": [39048784.0, 35640980.0, 28880248.0, 30231376.0, 29224340.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 89, "manager": "임시매장", "name": "해운대1호점", "region": "부산", "months": [23602250.0, 24322750.0, 19673500.0, 18802950.0, 19345600.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 90, "manager": "박영태 대리", "name": "목동점", "region": "서울", "months": [19059736.0, 20631208.0, 20338764.0, 18387014.0, 17757880.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 91, "manager": "이중섭 대리", "name": "굴포천역점", "region": "인천", "months": [18178864.0, 19653364.0, 20064076.0, 15548620.0, 18537012.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 92, "manager": "임시매장", "name": "수원시청역점", "region": "경기", "months": [20456180.0, 16854228.0, 18942508.0, 20423796.0, 20396980.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 93, "manager": "김태환 과장", "name": "세종아름점", "region": "세종", "months": [13322260.0, 16375148.0, 19959516.0, 11692012.0, 15012568.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 94, "manager": "임도형 과장", "name": "동탄호수공원점", "region": "경기", "months": [30814606.0, 43208094.0, 35905350.0, 37396840.0, 43105136.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 95, "manager": "김태환 과장", "name": "광주상무점", "region": "광주", "months": [41492736.0, 36550760.0, 37847956.0, 33435316.0, 35493896.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 96, "manager": "이중섭 대리", "name": "원주무실점", "region": "강원", "months": [43712024.0, 49785436.0, 40109308.0, 45618552.0, 42107816.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 97, "manager": "임도형 과장", "name": "구미옥계점", "region": "경북", "months": [13030088.0, 15187558.0, 16488592.0, 19739414.0, 15098460.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 98, "manager": "박영태 대리", "name": "분당정자점", "region": "경기", "months": [21877414.0, 21021208.0, 22847172.0, 24503018.0, 24719420.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 99, "manager": "강동우 사원", "name": "시흥배곧점", "region": "경기", "months": [38794381.6, 38716496.0, 39437230.4, 37016476.0, 43445248.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 100, "manager": "임도형 과장", "name": "구미봉곡점", "region": "경북", "months": [17612640.0, 25001814.0, 18790420.0, 22595708.0, 15976180.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 101, "manager": "임도형 과장", "name": "대구감삼점", "region": "대구", "months": [37128512.0, 42849356.0, 34256858.0, 40935782.0, 49230516.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 102, "manager": "박영태 대리", "name": "DMC점", "region": "서울", "months": [26692280.0, 32351570.0, 21051770.0, 24042694.0, 27703068.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 103, "manager": "박영태 대리", "name": "왕십리점", "region": "서울", "months": [26168428.0, 66008452.0, 39025185.0, 24294487.0, 22715900.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 104, "manager": "박영태 대리", "name": "강남역점", "region": "서울", "months": [57824354.0, 53732946.0, 66922947.0, 58757700.0, 52552816.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 105, "manager": "이중섭 대리", "name": "인천논현점", "region": "인천", "months": [22213024.0, 22847412.0, 23434648.0, 20498920.0, 30378628.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 106, "manager": "박영태 대리", "name": "화곡역점", "region": "서울", "months": [14783124.0, 27099332.0, 30618026.0, 30578886.0, 28073758.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 107, "manager": "임시매장", "name": "울산구영점", "region": "울산", "months": [9393544.0, 12385504.0, 14805728.0, 11841080.0, 14865020.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 108, "manager": "임시매장", "name": "김해율하점", "region": "경남", "months": [12857048.0, 17100656.0, 17038020.0, 13694260.0, 13461120.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 109, "manager": "강동우 사원", "name": "풍동점", "region": "경기", "months": [20184524.0, 19335660.0, 21365504.0, 21253292.0, 24618268.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 110, "manager": "이중섭 대리", "name": "대전둔산점", "region": "대전", "months": [41021759.0, 34725772.0, 30934760.0, 32750490.0, 25442932.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 111, "manager": "임도형 과장", "name": "오산세교점", "region": "경기", "months": [20853440.0, 25728500.0, 26874096.0, 23167794.0, 28134719.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 112, "manager": "임도형 과장", "name": "상주점", "region": "경북", "months": [12752230.0, 12116060.0, 14349650.0, 11543248.0, 14360876.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 113, "manager": "박영태 대리", "name": "대치점", "region": "서울", "months": [25998002.0, 24229168.0, 26631512.0, 20969726.0, 21707384.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 114, "manager": "임도형 과장", "name": "경주용황점", "region": "경북", "months": [20704776.0, 27189120.0, 18490368.0, 19630840.0, 22998940.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 115, "manager": "임시매장", "name": "창원중동점", "region": "경남", "months": [21228556.0, 25116492.0, 18047472.0, 14774888.0, 14506064.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 116, "manager": "임도형 과장", "name": "수성범어점", "region": "대구", "months": [32484084.0, 32909188.0, 31938976.0, 32085168.0, 30137592.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 117, "manager": "임도형 과장", "name": "아산탕정신도시점", "region": "충남", "months": [18768628.0, 26021420.0, 25014920.0, 28934240.0, 25833540.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 118, "manager": "박영태 대리", "name": "구로디지털점", "region": "서울", "months": [17776649.6, 16155412.0, 18864672.0, 20330768.0, 17217912.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 119, "manager": "강동우 사원", "name": "시흥은계점", "region": "경기", "months": [8028088.0, 20144744.0, 13210140.0, 10577480.0, 9288596.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 120, "manager": "강동우 사원", "name": "화정점", "region": "경기", "months": [20464212.0, 20691512.0, 18751996.0, 17747800.0, 24080400.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 121, "manager": "임도형 과장", "name": "지산범물점", "region": "대구", "months": [20232612.0, 26463708.0, 13282128.0, 15358580.0, 17757484.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 122, "manager": "임도형 과장", "name": "홍성내포점", "region": "충남", "months": [21185916.0, 25159208.0, 25009868.0, 19865980.0, 19832280.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 123, "manager": "임도형 과장", "name": "포항이동점", "region": "경북", "months": [22731060.0, 19738880.0, 21157236.0, 16751096.0, 20263560.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 124, "manager": "이중섭 대리", "name": "대전관평점", "region": "대전", "months": [30441560.0, 32881884.0, 31361256.0, 29381784.0, 28230724.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 125, "manager": "임시매장", "name": "호매실점", "region": "경기", "months": [24406139.0, 28287214.0, 24245765.0, 20422410.0, 24342344.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 126, "manager": "이중섭 대리", "name": "논산점", "region": "충남", "months": [16419121.0, 14730200.0, 16540840.0, 13200312.0, 15392720.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 127, "manager": "김태환 과장", "name": "오창점", "region": "충북", "months": [12360000.0, 22876988.0, 16893696.0, 15547400.0, 15902968.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 128, "manager": "임시매장", "name": "우정혁신점", "region": "울산", "months": [23232228.0, 25620060.0, 26193608.0, 22918796.0, 23451140.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 129, "manager": "임도형 과장", "name": "화성봉담2지구점", "region": "경기", "months": [19296968.0, 19619120.0, 21708516.0, 15975480.0, 19675168.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 130, "manager": "강동우 사원", "name": "상봉역점", "region": "서울", "months": [26917888.0, 24187984.0, 27186966.0, 21190732.0, 21966964.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 131, "manager": "임시매장", "name": "강동구청점", "region": "서울", "months": [34914688.0, 27887416.0, 41306740.0, 37393600.0, 29593724.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 132, "manager": "이중섭 대리", "name": "군산조촌점", "region": "전북", "months": [23642592.0, 28598820.0, 32149756.0, 26824628.0, 31057220.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 133, "manager": "강동우 사원", "name": "월곡점", "region": "서울", "months": [34652928.0, 30809068.0, 24115016.0, 25376984.0, 30649215.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 134, "manager": "박영태 대리", "name": "사당역점", "region": "서울", "months": [32223017.6, 29631732.0, 29402656.0, 31694912.0, 23284476.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 135, "manager": "강동우 사원", "name": "일산동구청점", "region": "경기", "months": [20550024.0, 22465528.0, 29818414.0, 28360458.0, 27270613.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 136, "manager": "강동우 사원", "name": "구파발역점", "region": "서울", "months": [11366977.6, 20291043.6, 13489080.0, 14060128.0, 16903644.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 137, "manager": "박영태 대리", "name": "경복궁역점", "region": "서울", "months": [43927094.0, 58155064.0, 49610540.0, 46393352.0, 37590712.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 138, "manager": "박영태 대리", "name": "여의도점", "region": "서울", "months": [43768526.0, 41934288.0, 36507012.0, 41869984.0, 32842372.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 139, "manager": "박영태 대리", "name": "서대문역점", "region": "서울", "months": [33034062.0, 28458238.0, 31705120.0, 28435640.0, 22519188.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 140, "manager": "이중섭 대리", "name": "송도스마트스퀘어점", "region": "인천", "months": [21528768.0, 18707756.0, 20095448.0, 20286592.0, 14207680.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 141, "manager": "임시매장", "name": "창원시청점", "region": "경남", "months": [26266060.0, 23601264.0, 24172696.0, 20582452.0, 20721540.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 142, "manager": "강동우 사원", "name": "파주교하점", "region": "경기", "months": [22094265.6, 21566772.0, 20072740.0, 20597392.0, 20607226.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 143, "manager": "박영태 대리", "name": "서울대입구역점", "region": "서울", "months": [22714932.0, 37383829.0, 30037871.6, 29150109.6, 27128248.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 144, "manager": "임도형 과장", "name": "대구청라언덕점", "region": "대구", "months": [20305928.0, 18328748.0, 18904060.0, 18499647.6, 20487288.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 145, "manager": "박영태 대리", "name": "동작구청점", "region": "서울", "months": [15626320.0, 14686700.0, 13977144.0, 11391808.0, 13757156.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 146, "manager": "박영태 대리", "name": "삼성중앙역점", "region": "서울", "months": [0.0, 0.0, 20922308.0, 20838894.0, 18472188.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 147, "manager": "김태환 과장", "name": "순천신대점", "region": "전남", "months": [0.0, 0.0, 12517800.0, 22013868.0, 23501440.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 148, "manager": "박영태 대리", "name": "을지로3가점", "region": "서울", "months": [0.0, 0.0, 10242410.4, 31603024.0, 23783200.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 149, "manager": "박영태 대리", "name": "분당야탑점", "region": "경기", "months": [0.0, 0.0, 0.0, 10918048.0, 22462714.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"no": 150, "manager": "임도형 과장", "name": "포항문덕점", "region": "경북", "months": [0.0, 0.0, 0.0, 19476260.0, 24621468.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}];
-  ALL = embeddedData.map(d => {
-    const vals = d.months.filter(v => v > 0);
-    return {
-      no: d.no,
-      manager: d.manager,
-      name: d.name,
-      region: d.region || '기타',
-      months: d.months,
-      avg: vals.length ? Math.round(vals.reduce((s,v)=>s+v,0)/vals.length) : 0
-    };
-  }).filter(d => d.avg > 0);
-  currentFilter = 'all';
-  currentRegion = 'all';
+  // 25년 데이터 (매장명 → 월별 매출)
+    const data25=[{"name":"부산명지점","months":[25214708,21214176,28424324,28574872,30883476,17315620,20040984,15251660,25701856,25634020,23334428,37318660]},{"name":"여수웅천점","months":[10214880,19654092,13129796,11541880,15488104,10940100,7351688,9197388,10295960,10630858,10362056,13134400]},{"name":"파주금촌점","months":[23062132,19250984,21649432,25714500,27080284,18697640,12549132,11238916,15519340,20205920,15683784,21995268]},{"name":"안산본점","months":[19269350,16925950,19684300,24158400,30161240,18187776,17662254,15941316,19151568,22759206,20871540,27261774]},{"name":"김천점","months":[9164600,8538954,8200518,8908625,10366400,9907072,6740604,4325700,7634560,8311524,11570108,12871122]},{"name":"인천가좌점","months":[29442216,25072964,28688576,27411500,33698872,23304116,20648180,22438520,23287552,27538000,24333784,25821464]},{"name":"안산중앙점","months":[34723250,30825800,43443100,36064950,40419954,27359024,24011192,27644068,37157736,39592716,36069500,41470673]},{"name":"대전직영본점","months":[43636350,38800500,40295600,36115400,46209332,31507410,27003806,25478028,31837792,35496400,45259216,55318246]},{"name":"다산점","months":[23807084,22832628,24692484,21858108,26484168,18529104,15289156,14210576,18904720,23147700,19212216,25049628]},{"name":"수원천천점","months":[22676500,20709516,22652300,21120648,29155500,15995644,16950228,15882116,24133312,24096496,21479130,30739412]},{"name":"인천송도점","months":[22214464,21804698,23365408,26332100,27791188,17108258,23187124,15974356,21001262,23555180,23507778,22682476]},{"name":"당하점","months":[19537500,15888256,16911544,15371160,19767712,14174180,11724712,12770588,14719212,18671148,23131480,31959456]},{"name":"김포구래점","months":[18572188,17431872,20069078,17894104,22864170,14512632,14232340,11386220,12860150,19130638,17271254,21279650]},{"name":"광주첨단점","months":[21563604,19067116,26861860,22755280,28099784,19539784,19288964,17425480,23207820,21046500,31293236,29186948]},{"name":"부천중동점","months":[28685464,27340502,29249660,23364864,27645996,19512780,20014536,15538248,26722256,32073580,25587444,31550560]},{"name":"인천구월점","months":[27133784,22917800,22760552,22179400,31175498,18073748,27322388,18050896,31989804,24370228,22783120,34290460]},{"name":"광명점","months":[29597388,25147570,28503025,30227450,28775960,22869860,21925312,19607948,29736720,31186416,34110676,35994116]},{"name":"양주옥정점","months":[31748972,23623673,27553584,23577344,30338356,18475200,15725648,17399848,24615972,26021224,19681012,26977936]},{"name":"부천옥길점","months":[13681232,11799908,13806632,15856908,19583108,9967128,9312416,9874570,14383350,13420370,14759596,16752928]},{"name":"하남시청역점","months":[12930624,12169400,11221178,10600748,14325840,20034440,15649120,19996248,24212520,22722212,19443244,29916404]},{"name":"조치원점","months":[6499200,23723412,5403400,4226992,4957616,3104780,3100452,4983060,4318200,5893820,4243500,8689010]},{"name":"안양평촌점","months":[25048828,24766132,22189852,25258904,30071400,20716880,16215024,15938972,22213250,22764536,21985194,30030616]},{"name":"파주운정점","months":[27049290,27471802,29992514,28892066,33744304,25324376,23446984,19625040,23197160,28467844,23379872,29009384]},{"name":"잠실석촌고분역점","months":[28784942,20799736,19187120,20137356,23324400,17525176,13613692,16435196,21009180,15083252,15750878,18200339]},{"name":"과천점","months":[27105814,27488472,24023170,28287026,24812544,25597500,16502056,14804914,26530146,21495960,21975928,29327364]},{"name":"은평역촌점","months":[35112000,29479450,29803400,27211800,35958450,22868676,21912740,21677208,26053550,32173730,35084580,32943316]},{"name":"노원하계점","months":[26166352,23307942,20853516,16893432,27409334,14153384,13883896,16729516,19160028,21146900,20332408,29978466]},{"name":"부평청천점","months":[22302700,19333436,16781460,18900604,18088128,11836544,10838180,9638980,16818176,13427120,14075484,18193120]},{"name":"동탄목동점","months":[18267472,13195108,18201428,17435504,19168984,9950116,7138328,7805598,14526600,16359436,15914748,17394404]},{"name":"용현SK점","months":[24992440,21136316,22693980,23092508,22408024,20169012,17818508,21060868,22587952,23570552,22288152,26837966]},{"name":"김포풍무점","months":[18972066,12131420,14241616,13082668,16792160,9077528,10615888,9244280,14181960,13379752,12335600,19822568]},{"name":"세종나성점","months":[20516588,20652684,23738984,20411984,29665948,15145100,17120316,17112372,16062744,15838720,15198476,24001880]},{"name":"청주동남지구점","months":[30542328,26433736,31269632,23925886,34840620,25258136,25694744,15903924,29576060,28795516,25771376,32408503]},{"name":"용호빌리브점","months":[17251952,12647566,19132166,12853980,16575424,11566660,7281654,7829854,14914944,15950988,12410978,17004120]},{"name":"아산풍기점","months":[16070712,21380700,16288060,17150496,15981500,13469200,14780880,12891316,14996708,17961460,17684160,18995772]},{"name":"충주점","months":[25650084,21874976,26670816,21932312,24920740,19866780,27871488,18643460,25642840,26522176,23929224,32510100]},{"name":"연수동춘점","months":[21245124,21900932,21523584,20747786,24159884,17151356,14649308,11991740,17973876,21593244,22971236,24500863]},{"name":"마곡역점","months":[46204588,25153644,24217892,28818652,28523178,19808144,13472812,17555324,24993248,32426488,28033976,42261844]},{"name":"광교점","months":[27831424,32028640,26736236,26649160,23570680,20904592,18928140,24766820,21197240,26185344,26225796,34073656]},{"name":"계산점","months":[26817438,24010332,27797220,29636424,26630460,18517480,18528856,21376248,21822064,24963792,25496340,28955196]},{"name":"청라점","months":[25218162,26674416,24381740,24082696,28563754,19155446,17190962,18278578,28342060,25188886,27011842,40086150]},{"name":"군포산본점","months":[23003240,19095360,20631044,19441032,22630112,14616144,11628280,12726672,18741152,18912456,22198488,24973124]},{"name":"분당서현점","months":[38764912,22733972,40007825,43970144,41312416,26810180,33721820,27208216,34419336,34011356,33896072,46378136]},{"name":"전주에코시티점","months":[30207740,29130504,30816100,27211800,28654788,23033964,18413308,20739820,25144308,28660940,25362268,41209780]},{"name":"삼각산점","months":[30875040,21232128,23561700,20548488,31745464,19225052,15260796,11288048,20075972,22793928,21145656,25752000]},{"name":"영종하늘도시점","months":[22837240,23448460,26374048,26216264,26456180,20654288,18484408,17704680,21814772,43766248,21489860,27183288]},{"name":"서창점","months":[15866688,16866600,18118820,13467344,18250820,14919668,13453616,11832904,15083004,15652364,14432280,20099212]},{"name":"수원망포점","months":[27492932,23010784,28892612,27248392,28255640,20391520,15918468,17260604,34036712,18846744,27546124,32541708]},{"name":"동탄능동점","months":[23883808,20098638,23595664,23289448,28929508,23089628,17774516,17956384,22667268,22732348,28473320,24690812]},{"name":"안성공도점","months":[17903796,14550076,19286076,12747616,18399844,19024476,9339604,12020920,17816620,17144600,14637616,15698024]},{"name":"침산점","months":[28723486,22483984,21942359,22514525,25271044,14207552,21029100,15125372,20031808,23496216,19883992,28738692]},{"name":"송파위례점","months":[33246030,34299348,30008932,27667644,34319242,20915496,14125052,17421500,26093144,26601146,28077588,31879426]},{"name":"광주수완점","months":[37019352,37105100,45326400,40885350,44892308,27302184,34216069,28430796,38952838,43851720,42561732,52258360]},{"name":"부산화명점","months":[40367630,32760950,35459710,31831390,37101938,27745368,20882932,26934700,32894944,37182624,33845757,48756014]},{"name":"검단신도시점","months":[25094328,25138300,25256836,23387728,33726268,19886328,19802648,20726316,37747828,31940900,27302652,27681744]},{"name":"강동상일점","months":[27671600,32828200,29437092,25952288,31175732,20956692,21409436,15325200,25083688,26008576,27896964,28592076]},{"name":"비전점","months":[21218752,18316376,26279232,20253864,25459176,18428768,16211168,13349020,21211420,19403516,20053624,29124440]},{"name":"용인역북점","months":[19113050,22749892,23000450,19760950,23579225,24502084,14338048,16857410,18817640,20698352,19738660,21567966]},{"name":"익산영등점","months":[22126196,17735360,21497212,21214300,26281080,16547760,15657568,13044640,21909488,25478868,17276240,27349908]},{"name":"광화문점","months":[54305800,56993000,52083350,57279400,50039650,41825950,39666900,35271200,47464050,45629450,55715900,60706500]},{"name":"영등포시장점","months":[39545984,27742016,35921188,38217148,38580188,29701776,28736098,24459576,31102820,24876728,27198478,38487984]},{"name":"신용산점","months":[56554966,54092840,51974904,49479614,53589272,44328212,35842432,33485512,39016292,42631620,42192047,51727584]},{"name":"수지구청역점","months":[34338700,20569200,40169800,36930300,43085350,25571238,23545588,22683152,24039664,43946408,37443742,45727145]},{"name":"청주율량점","months":[28891012,26323748,15474500,21979000,20169200,19157872,13552850,12915570,18494860,18417240,23680260,25623524]},{"name":"광주진월점","months":[25811052,20718924,22946999,27211800,27327484,16883840,23763500,13316300,24286820,25006300,24989500,31206788]},{"name":"청주터미널점","months":[25207740,16866600,29056924,26488200,27767420,23605100,22920412,18553260,21781772,22416976,23876004,31546200]},{"name":"일산킨텍스점","months":[24353021,25620094,27930995,24705606,28139236,18963328,19269386,19207990,22544626,24946574,24380368,30692738]},{"name":"시흥목감점","months":[18603544,17919800,18627742,19063500,21040008,15277860,11135468,11255120,14205608,18150700,16573124,19018636]},{"name":"강남논현점","months":[24296250,32395000,19437000,40169800,30127350,19709652,34546944,28579792,20521560,43746616,59054012,42479824]},{"name":"당진점","months":[13446972,22424160,19437000,10865160,16110960,12858112,10243360,11979620,14056620,16589660,11117916,17054296]},{"name":"문정점","months":[4942664,18508296,16282754,19504672,24296250,19152948,15465492,12910820,18386804,19017828,32224320,25062332]},{"name":"대구월성점","months":[24305652,27190164,15681284,16384472,18595556,14074082,14467940,10105036,15944752,21386416,16507884,31386008]},{"name":"양산범어점","months":[20184344,15417140,17645684,18323348,23762972,13427420,15983048,10162200,15673124,19314000,13988040,27120868]},{"name":"동해이도점","months":[26737800,22319704,20488700,19820040,21442208,18007780,16304560,13024360,19142500,26735380,19530204,31611428]},{"name":"남악점","months":[23846230,25072990,25301384,18223160,22402528,16914336,17811844,14400188,19119360,20702552,18197884,23242488]},{"name":"미사역점","months":[28935532,27161984,31139988,33825816,34724668,23735156,19383928,21503508,25187156,23413020,25083562,28839717]},{"name":"용인동백점","months":[21095364,29965375,18363678,20456344,23500564,15260552,23343308,14878408,25243934,25974688,24423500,34100730]},{"name":"상록수역점","months":[15963036,15060692,18796772,15154744,18008560,11055074,9939440,11537324,20229120,19253440,16912924,18672136]},{"name":"김포장기점","months":[23648350,19848436,20408850,19437000,28084004,15001968,14148664,12750044,22617008,23194316,23801816,32381922]},{"name":"경남대점","months":[18142908,15796708,15593004,16620188,18789100,12509804,13248340,9674560,14759612,16881254,16353568,19991364]},{"name":"거제수월점","months":[25676127,25072990,28030139,22641444,22669686,26511660,21276860,13865784,22252200,24347652,27573160,34467844]},{"name":"포항양덕점","months":[31509112,29717184,29095896,24793064,24892564,18872768,17457168,13084360,29690520,25218300,27401668,30504626]},{"name":"대구칠곡점","months":[31311548,30553372,27906632,25274624,28134188,18708276,20482008,20172880,23332860,34028410,33061688,41434392]},{"name":"잠실스타파크점","months":[21833382,19315128,21845825,20805256,22425959,15583308,17153880,11626588,17771160,20997140,19772646,28328030]},{"name":"안양비산점","months":[37637520,28939936,29708260,33632734,38566588,24375852,22601476,26293876,27709420,32444524,30576648,38697428]},{"name":"목동파리공원점","months":[24552804,16547192,20766280,25995736,22582456,18364612,16041184,10907616,17469820,19594636,20607540,24656572]},{"name":"삼송점","months":[22420896,19277372,17478395,18882116,23613384,15660808,15165956,15028312,15421920,23327676,19683488,23775664]},{"name":"공덕점","months":[40070840,34629032,38447310,34495482,37350044,27103574,29843452,18887248,46206148,26811652,38110740,39873408]},{"name":"전주혁신도시점","months":[20491092,18166780,18692692,16776420,18076124,11891514,13917580,14922180,17245670,17969812,17242940,19084792]},{"name":"의정부민락점","months":[32336748,27145206,30613524,27949776,36915868,23425700,26264476,23830288,35013140,29089384,34711784,46688568]},{"name":"해운대1호점","months":[28343400,23607050,19430600,16965000,24622200,16355700,13705150,12354400,23431160,21354650,17278449,33942940]},{"name":"목동점","months":[23815934,22645660,24631394,20084900,23397864,19515668,12776148,14548512,18593576,19862144,21587736,25835904]},{"name":"굴포천역점","months":[18223740,18465150,26239950,15714188,20246875,12394188,12669440,14581092,21740328,18076596,15486738,23668908]},{"name":"수원시청역점","months":[25445140,2844300,22273456,20907376,21921256,15836508,13772932,17058844,18841940,20099732,19612268,24576948]},{"name":"세종아름점","months":[18221784,29417608,18209240,15350896,17909408,14382088,8754800,14982468,16131276,13524940,19688016,25257924]},{"name":"동탄호수공원점","months":[36930300,36606350,52479900,47296700,52662696,31911308,51464304,32128856,31687324,52521452,32922888,47704152]},{"name":"광주상무점","months":[50155350,34434808,47354000,39595188,35087488,26746496,35758507,27585780,40792484,34296900,34745344,33953564]},{"name":"원주무실점","months":[40022324,44643288,44338210,37104768,44562952,34041982,29966000,30373252,39407736,46012588,44632584,57588808]},{"name":"구미옥계점","months":[16774102,19184912,16994988,17307198,18793320,11192442,13181378,10485238,16263720,18553014,17925906,24173076]},{"name":"분당정자점","months":[23844026,27470496,22850728,23811651,20338503,16800662,14958056,15022850,24611428,21820034,27253688,31762816]},{"name":"시흥배곧점","months":[37902864,33203672,42797352,41406292,43955128,32219044,29079830,25102308,34441152,41941328,44720884,55594638]},{"name":"구미봉곡점","months":[21081650,19298296,25342744,18245658,20304894,16509878,15196760,14304038,17010678,32381690,21284314,27323564]},{"name":"대구감삼점","months":[45288454,38691070,36776210,38185411,50168926,28899711,25368352,26960010,39441802,41630396,42248140,51437022]},{"name":"DMC점","months":[33434556,28304560,29880068,30365116,30914636,22227734,20448820,21725236,28070614,30077349,29078190,47405340]},{"name":"왕십리점","months":[54747550,31747100,46000900,37254250,34986600,22608044,42490680,27488400,21044544,36876248,57121060,44541344]},{"name":"강남역점","months":[61718992,67323746,63135590,67642774,55931320,47060068,46972096,44302370,57845532,52970394,57402288,78640916]},{"name":"인천논현점","months":[19847420,22386984,21931912,20162676,24844248,20198100,14379820,14321056,21005636,28380656,20504216,25600304]},{"name":"화곡역점","months":[31785046,23053076,28369376,28770156,33208800,21128973,18712582,14341906,21364460,31542000,24988028,37093958]},{"name":"울산구영점","months":[15294228,14436624,12738528,12079360,14527220,8473528,8237000,8088780,12143560,13634400,12632816,23751980]},{"name":"김해율하점","months":[19194386,18825376,20082084,17073600,23979700,16855268,14022780,13994892,16110644,16216788,16918400,21555996]},{"name":"풍동점","months":[26669384,28508888,32390660,29990812,37161610,21033992,16674420,15040660,19971420,23701460,18712720,32103660]},{"name":"대전둔산점","months":[39751750,33783150,33477000,32365600,34014750,23282996,24314258,23990604,26408340,31542006,34418102,45605930]},{"name":"오산세교점","months":[17733428,15048864,22615404,21608952,26756420,17085852,17947708,21893300,27506020,22630172,27658058,31586030]},{"name":"상주점","months":[16999508,11952928,15618300,14801120,14850400,9146468,8501900,9557500,13134200,11650110,14641320,16089670]},{"name":"대치점","months":[40236540,30424652,31416010,29507360,31629094,23778372,20297564,19317300,26267108,28228772,29616108,25682648]},{"name":"경주용황점","months":[25258920,17997400,21882855,22279180,26239950,16728920,18645196,12287804,21066860,25030076,21070436,35025980]},{"name":"창원중동점","months":[24424206,21769076,17872472,19276060,27535750,15627572,13647676,12851076,23090874,17636796,17880064,27094588]},{"name":"수성범어점","months":[38654582,32963702,36574150,33596530,39652884,26515684,21427624,24095756,29729381,28991600,34558288,46609510]},{"name":"아산탕정신도시점","months":[25592050,13459216,22028600,24458225,30937225,18427928,17705680,19835180,20956200,21765384,22530204,33121332]},{"name":"구로디지털점","months":[16153660,14142904,18706840,18141200,17438396,16357408,15152684,13789080,19106928,15925400,19748632,23689145]},{"name":"시흥은계점","months":[7622372,10251220,11048380,10981084,12572420,9328092,9013404,7839740,10109124,8489754,12578720,20784682]},{"name":"화정점","months":[21219912,14816572,17648848,19899824,21789384,15275604,14221890,12894138,16312186,17651487,16901748,24665057]},{"name":"지산범물점","months":[19035812,12305720,15135664,14369640,17980428,12991228,14183144,12848810,15995620,20196708,27450062,31429920]},{"name":"홍성내포점","months":[28167348,21874976,26634320,22823480,23511788,18041788,16360800,15193368,17230820,17261960,18068880,32595240]},{"name":"포항이동점","months":[30361840,19836376,17439564,19160752,21934400,16157000,18250920,9618528,13558112,15657860,19701960,32166844]},{"name":"대전관평점","months":[36059210,29417608,29682890,31838386,29625042,21202966,22584248,16230006,32931028,31747284,27766228,45658607]},{"name":"호매실점","months":[24792227,17358516,26428476,21998846,22919669,18910528,16816722,13722324,21127352,23204062,22613151,30275981]},{"name":"논산점","months":[12662692,10239328,11873040,12150468,20976728,13906840,11828580,12217120,13218004,17820566,15836156,18894580]},{"name":"오창점","months":[21999720,21945808,20394244,17654066,17621900,10668744,11571608,8590588,16011480,17666800,14308876,18971200]},{"name":"우정혁신점","months":[24614912,16644105,19773663,23542824,23648350,21432064,18607320,16928568,26108368,22735148,26633210,39421866]},{"name":"화성봉담2지구점","months":[21995794,16902628,18858224,16994500,18589386,13828028,9210280,10661931,13812116,17761560,18155540,21051712]},{"name":"상봉역점","months":[20404736,22284284,19787412,14901700,20215208,14922824,16849156,16182172,22379496,21871820,26564624,33126660]},{"name":"강동구청점","months":[19858200,29445382,26071938,30684024,28238860,21441492,24269996,19686920,30796448,28116680,31180098,42957956]},{"name":"군산조촌점","months":[0,0,21283860,26922160,27152344,20503420,17207960,13680800,19936480,26593640,25381484,35021972]},{"name":"월곡점","months":[0,0,22496050,31099200,32071050,14072640,19708148,39212240,12717200,36024980,51712184,38297525]},{"name":"사당역점","months":[0,0,0,30244550,38532762,26930624,33594364,25751532,26378264,25183630,30520304,31291024]},{"name":"일산동구청점","months":[0,0,0,0,23888000,22838320,20437838,19951910,22611851,22478850,23970308,26429155]},{"name":"구파발역점","months":[0,0,0,0,0,8479300,11443500,10707822,14727020,13814880,14987812,19280894]},{"name":"경복궁역점","months":[0,0,0,0,0,0,0,7658400,46946860,45390464,46846672,49910668]},{"name":"여의도점","months":[0,0,0,0,0,0,0,0,24671640,36549436,34393716,63710438]},{"name":"서대문역점","months":[0,0,0,0,0,0,0,0,17982800,22873328,31758476,33360642]},{"name":"송도스마트스퀘어점","months":[0,0,0,0,0,0,0,0,1198000,14050500,19332390,27779988]},{"name":"창원시청점","months":[0,0,0,0,0,0,0,0,0,13374350,25456540,41133924]},{"name":"파주교하점","months":[0,0,0,0,0,0,0,0,0,0,12430700,28333140]},{"name":"서울대입구역점","months":[0,0,0,0,0,0,0,0,0,0,19670850,34668972]}];
+  ALL25={};
+  data25.forEach(d=>{ ALL25[d.name]=d.months; });
+
+  // 26년 데이터
+    const data26=[{"no":1,"manager":"임시매장","name":"부산명지점","region":"부산","months":[23560003,20358308,24963328,22837280,24681106,0,0,0,0,0,0,0]},{"no":2,"manager":"김태환 과장","name":"여수웅천점","region":"전남","months":[11860568,11898288,17382680,13116120,14534480,0,0,0,0,0,0,0]},{"no":3,"manager":"강동우 사원","name":"파주금촌점","region":"경기","months":[16119620,16262200,21150380,21956900,18972040,0,0,0,0,0,0,0]},{"no":4,"manager":"김태환 과장","name":"안산본점","region":"경기","months":[17854588,27370655,18656000,17160696,23221920,0,0,0,0,0,0,0]},{"no":5,"manager":"임도형 과장","name":"김천점","region":"경북","months":[9857968,8062650,10181526,14606500,10311536,0,0,0,0,0,0,0]},{"no":6,"manager":"이중섭 대리","name":"인천가좌점","region":"인천","months":[29312276,28755404,24366800,24764720,26129588,0,0,0,0,0,0,0]},{"no":7,"manager":"김태환 과장","name":"안산중앙점","region":"경기","months":[36855433,34266091,37048569,34710214,40907824,0,0,0,0,0,0,0]},{"no":8,"manager":"이중섭 대리","name":"대전직영본점","region":"대전","months":[35125972,40965536,37532715,32833116,33590732,0,0,0,0,0,0,0]},{"no":9,"manager":"강동우 사원","name":"다산점","region":"경기","months":[16683684,18060984,21213080,22047720,25833596,0,0,0,0,0,0,0]},{"no":10,"manager":"임시매장","name":"수원천천점","region":"경기","months":[18326296,22868172,25190040,21792480,23222516,0,0,0,0,0,0,0]},{"no":11,"manager":"이중섭 대리","name":"인천송도점","region":"인천","months":[22119744,16066398,21026180,16562784,20116336,0,0,0,0,0,0,0]},{"no":12,"manager":"이중섭 대리","name":"당하점","region":"인천","months":[22745142,25046442,18124920,24643476,19720856,0,0,0,0,0,0,0]},{"no":13,"manager":"이중섭 대리","name":"김포구래점","region":"경기","months":[17330720,19178808,20653876,20469874,22148828,0,0,0,0,0,0,0]},{"no":14,"manager":"김태환 과장","name":"광주첨단점","region":"광주","months":[21771344,24532520,24588980,20445270,20435410,0,0,0,0,0,0,0]},{"no":15,"manager":"강동우 사원","name":"부천중동점","region":"경기","months":[26139986,29824430,33824540,26931548,31577026,0,0,0,0,0,0,0]},{"no":16,"manager":"이중섭 대리","name":"인천구월점","region":"인천","months":[28753232,24517716,26804372,28334264,26589980,0,0,0,0,0,0,0]},{"no":17,"manager":"이중섭 대리","name":"광명점","region":"경기","months":[23901404,20706980,26620652,26303016,28476977,0,0,0,0,0,0,0]},{"no":18,"manager":"강동우 사원","name":"양주옥정점","region":"경기","months":[20115500,30540228,23098388,19493584,25707988,0,0,0,0,0,0,0]},{"no":19,"manager":"강동우 사원","name":"부천옥길점","region":"경기","months":[11579438,15128856,16088500,14189924,15796008,0,0,0,0,0,0,0]},{"no":20,"manager":"임시매장","name":"하남시청역점","region":"경기","months":[19419656,23238680,22871748,19702200,37194600,0,0,0,0,0,0,0]},{"no":21,"manager":"김태환 과장","name":"조치원점","region":"세종","months":[5895600,4856500,3932776,4255600,4901660,0,0,0,0,0,0,0]},{"no":22,"manager":"임도형 과장","name":"안양평촌점","region":"경기","months":[20506004,24468460,24079848,22978560,28358660,0,0,0,0,0,0,0]},{"no":23,"manager":"박영태 대리","name":"과천점","region":"경기","months":[27115774,29238148,26769436,26794160,28074820,0,0,0,0,0,0,0]},{"no":24,"manager":"강동우 사원","name":"은평역촌점","region":"서울","months":[28584364,33093638,32562408,29841564,32048768,0,0,0,0,0,0,0]},{"no":25,"manager":"강동우 사원","name":"노원하계점","region":"서울","months":[22115402,20423884,24707438,21828296,24785844,0,0,0,0,0,0,0]},{"no":26,"manager":"이중섭 대리","name":"부평청천점","region":"인천","months":[14417132,19058560,20367120,16791720,15150272,0,0,0,0,0,0,0]},{"no":27,"manager":"임도형 과장","name":"동탄목동점","region":"경기","months":[15983247,19020320,16785780,22646360,19374844,0,0,0,0,0,0,0]},{"no":28,"manager":"이중섭 대리","name":"용현SK점","region":"인천","months":[18292528,24724364,20294048,23153644,21889100,0,0,0,0,0,0,0]},{"no":29,"manager":"이중섭 대리","name":"김포풍무점","region":"경기","months":[12840744,17716048,12545468,10967240,11409516,0,0,0,0,0,0,0]},{"no":30,"manager":"김태환 과장","name":"세종나성점","region":"세종","months":[19384236,16131488,17906432,17118668,17941700,0,0,0,0,0,0,0]},{"no":31,"manager":"김태환 과장","name":"청주동남지구점","region":"충북","months":[29123558,24347988,27990240,27238196,28978868,0,0,0,0,0,0,0]},{"no":32,"manager":"임시매장","name":"용호빌리브점","region":"부산","months":[10197600,9751000,14310466,20998216,15576720,0,0,0,0,0,0,0]},{"no":33,"manager":"임도형 과장","name":"아산풍기점","region":"충남","months":[15254036,18890668,19691936,16936480,18012488,0,0,0,0,0,0,0]},{"no":34,"manager":"이중섭 대리","name":"충주점","region":"충북","months":[33019936,22367288,27718600,24642500,27665896,0,0,0,0,0,0,0]},{"no":35,"manager":"이중섭 대리","name":"연수동춘점","region":"인천","months":[6673240,16850846,13865538,15563690,17418196,0,0,0,0,0,0,0]},{"no":36,"manager":"박영태 대리","name":"마곡역점","region":"서울","months":[28255216,45665596,26315660,24901788,25480076,0,0,0,0,0,0,0]},{"no":37,"manager":"임시매장","name":"광교점","region":"경기","months":[26424412,29089372,28594884,26169272,26001264,0,0,0,0,0,0,0]},{"no":38,"manager":"이중섭 대리","name":"계산점","region":"인천","months":[24374220,26372483,24971760,21714740,25182204,0,0,0,0,0,0,0]},{"no":39,"manager":"이중섭 대리","name":"청라점","region":"인천","months":[22758440,36128332,33717218,18944754,26508752,0,0,0,0,0,0,0]},{"no":40,"manager":"임도형 과장","name":"군포산본점","region":"경기","months":[19399574,18500244,20222796,18689428,15530300,0,0,0,0,0,0,0]},{"no":41,"manager":"박영태 대리","name":"분당서현점","region":"경기","months":[37089184,36247933,30942516,33989284,34101128,0,0,0,0,0,0,0]},{"no":42,"manager":"이중섭 대리","name":"전주에코시티점","region":"전북","months":[26267932,32573996,40376840,29622422,34329196,0,0,0,0,0,0,0]},{"no":43,"manager":"강동우 사원","name":"삼각산점","region":"서울","months":[20074720,25558000,25907932,21830749,21390476,0,0,0,0,0,0,0]},{"no":44,"manager":"이중섭 대리","name":"영종하늘도시점","region":"인천","months":[19950828,21087044,25050704,21910390,26446380,0,0,0,0,0,0,0]},{"no":45,"manager":"이중섭 대리","name":"서창점","region":"인천","months":[13992176,21914992,19124139,16950316,21845728,0,0,0,0,0,0,0]},{"no":46,"manager":"임시매장","name":"수원망포점","region":"경기","months":[23654268,30128002,25549912,21525328,23522276,0,0,0,0,0,0,0]},{"no":47,"manager":"임도형 과장","name":"동탄능동점","region":"경기","months":[23862024,22747916,17677960,18468092,23881140,0,0,0,0,0,0,0]},{"no":48,"manager":"임도형 과장","name":"안성공도점","region":"경기","months":[11932196,13577368,15102720,12622356,14254380,0,0,0,0,0,0,0]},{"no":49,"manager":"임도형 과장","name":"침산점","region":"대구","months":[25418884,30643492,22390220,24648506,29458094,0,0,0,0,0,0,0]},{"no":50,"manager":"임시매장","name":"송파위례점","region":"서울","months":[26294308,23667134,27695802,22765532,26192498,0,0,0,0,0,0,0]},{"no":51,"manager":"김태환 과장","name":"광주수완점","region":"광주","months":[37901840,39988649,44984868,39883640,37538785,0,0,0,0,0,0,0]},{"no":52,"manager":"임시매장","name":"부산화명점","region":"부산","months":[36879198,37378420,34963380,31452224,39895584,0,0,0,0,0,0,0]},{"no":53,"manager":"이중섭 대리","name":"검단신도시점","region":"인천","months":[24294028,30857944,30300616,28525478,35305276,0,0,0,0,0,0,0]},{"no":54,"manager":"임시매장","name":"강동상일점","region":"서울","months":[18703258,24133326,28749836,26319636,26131316,0,0,0,0,0,0,0]},{"no":55,"manager":"임도형 과장","name":"비전점","region":"경기","months":[20929160,21534100,25159048,18817300,28867056,0,0,0,0,0,0,0]},{"no":56,"manager":"박영태 대리","name":"용인역북점","region":"경기","months":[18596024,18890012,22034964,16499468,21556520,0,0,0,0,0,0,0]},{"no":57,"manager":"이중섭 대리","name":"익산영등점","region":"전북","months":[22951476,17399800,23500476,20723336,19626696,0,0,0,0,0,0,0]},{"no":58,"manager":"박영태 대리","name":"광화문점","region":"서울","months":[50755050,44457350,44266750,49072150,66938198,0,0,0,0,0,0,0]},{"no":59,"manager":"박영태 대리","name":"영등포시장점","region":"서울","months":[27541288,31758006,25437124,27250778,28519280,0,0,0,0,0,0,0]},{"no":60,"manager":"박영태 대리","name":"신용산점","region":"서울","months":[40496152,39201380,39208264,34202744,34650208,0,0,0,0,0,0,0]},{"no":61,"manager":"박영태 대리","name":"수지구청역점","region":"경기","months":[39695032,35470500,34385844,35000064,36870720,0,0,0,0,0,0,0]},{"no":62,"manager":"김태환 과장","name":"청주율량점","region":"충북","months":[19742212,20648390,19016610,17281900,18028940,0,0,0,0,0,0,0]},{"no":63,"manager":"김태환 과장","name":"광주진월점","region":"광주","months":[29137420,24393360,24399608,26564820,24057600,0,0,0,0,0,0,0]},{"no":64,"manager":"김태환 과장","name":"청주터미널점","region":"충북","months":[25981428,26983540,26476324,25383764,31950436,0,0,0,0,0,0,0]},{"no":65,"manager":"강동우 사원","name":"일산킨텍스점","region":"경기","months":[17546980,23399924,27318500,23735078,25213040,0,0,0,0,0,0,0]},{"no":66,"manager":"강동우 사원","name":"시흥목감점","region":"경기","months":[15066880,16153480,17322120,16058120,14264820,0,0,0,0,0,0,0]},{"no":67,"manager":"박영태 대리","name":"강남논현점","region":"서울","months":[18929360,30173656,35797273,16824890,18587105,0,0,0,0,0,0,0]},{"no":68,"manager":"임도형 과장","name":"당진점","region":"충남","months":[11194300,16770720,15196740,12768888,13961664,0,0,0,0,0,0,0]},{"no":69,"manager":"임시매장","name":"문정점","region":"서울","months":[24012088,23612940,27034516,26727144,22951918,0,0,0,0,0,0,0]},{"no":70,"manager":"임도형 과장","name":"대구월성점","region":"대구","months":[17536528,24693220,20348404,22786240,19931084,0,0,0,0,0,0,0]},{"no":71,"manager":"임시매장","name":"양산범어점","region":"경남","months":[18039076,18151860,17767592,18886820,17518896,0,0,0,0,0,0,0]},{"no":72,"manager":"이중섭 대리","name":"동해이도점","region":"강원","months":[23235196,27108670,36222148,21544520,26982248,0,0,0,0,0,0,0]},{"no":73,"manager":"김태환 과장","name":"남악점","region":"전남","months":[21934580,18677460,25433594,18480640,16690608,0,0,0,0,0,0,0]},{"no":74,"manager":"임시매장","name":"미사역점","region":"경기","months":[23413020,23413020,23413020,26454608,24713576,0,0,0,0,0,0,0]},{"no":75,"manager":"박영태 대리","name":"용인동백점","region":"경기","months":[25186812,22488232,25811708,24742440,23408028,0,0,0,0,0,0,0]},{"no":76,"manager":"김태환 과장","name":"상록수역점","region":"경기","months":[16855800,19182830,16832562,15516968,18147280,0,0,0,0,0,0,0]},{"no":77,"manager":"이중섭 대리","name":"김포장기점","region":"경기","months":[25701104,27841548,24385764,25638952,30253992,0,0,0,0,0,0,0]},{"no":78,"manager":"임시매장","name":"경남대점","region":"경남","months":[25317310,16976292,16679724,13497948,16164381,0,0,0,0,0,0,0]},{"no":79,"manager":"임시매장","name":"거제수월점","region":"경남","months":[32173514,34523894,23301504,22586980,24762060,0,0,0,0,0,0,0]},{"no":80,"manager":"임도형 과장","name":"포항양덕점","region":"경북","months":[25518184,24776016,28420220,25768448,25604440,0,0,0,0,0,0,0]},{"no":81,"manager":"임도형 과장","name":"대구칠곡점","region":"대구","months":[27646500,32234872,23372564,30062864,28176032,0,0,0,0,0,0,0]},{"no":82,"manager":"임시매장","name":"잠실스타파크점","region":"서울","months":[18273964,27438880,21057924,18843120,14347096,0,0,0,0,0,0,0]},{"no":83,"manager":"임도형 과장","name":"안양비산점","region":"경기","months":[37826752,37178070,28450464,32018966,32702856,0,0,0,0,0,0,0]},{"no":84,"manager":"박영태 대리","name":"목동파리공원점","region":"서울","months":[18606228,21114548,20028456,23146036,23302872,0,0,0,0,0,0,0]},{"no":85,"manager":"강동우 사원","name":"삼송점","region":"경기","months":[16755836,23802280,18858944,19458820,18894104,0,0,0,0,0,0,0]},{"no":86,"manager":"박영태 대리","name":"공덕점","region":"서울","months":[32073444,33451290,29237142,35038952,29536606,0,0,0,0,0,0,0]},{"no":87,"manager":"이중섭 대리","name":"전주혁신도시점","region":"전북","months":[15629644,18848060,17683976,18758668,16139032,0,0,0,0,0,0,0]},{"no":88,"manager":"강동우 사원","name":"의정부민락점","region":"경기","months":[39048784,35640980,28880248,30231376,29224340,0,0,0,0,0,0,0]},{"no":89,"manager":"임시매장","name":"해운대1호점","region":"부산","months":[23602250,24322750,19673500,18802950,19345600,0,0,0,0,0,0,0]},{"no":90,"manager":"박영태 대리","name":"목동점","region":"서울","months":[19059736,20631208,20338764,18387014,17757880,0,0,0,0,0,0,0]},{"no":91,"manager":"이중섭 대리","name":"굴포천역점","region":"인천","months":[18178864,19653364,20064076,15548620,18537012,0,0,0,0,0,0,0]},{"no":92,"manager":"임시매장","name":"수원시청역점","region":"경기","months":[20456180,16854228,18942508,20423796,20396980,0,0,0,0,0,0,0]},{"no":93,"manager":"김태환 과장","name":"세종아름점","region":"세종","months":[13322260,16375148,19959516,11692012,15012568,0,0,0,0,0,0,0]},{"no":94,"manager":"임도형 과장","name":"동탄호수공원점","region":"경기","months":[30814606,43208094,35905350,37396840,43105136,0,0,0,0,0,0,0]},{"no":95,"manager":"김태환 과장","name":"광주상무점","region":"광주","months":[41492736,36550760,37847956,33435316,35493896,0,0,0,0,0,0,0]},{"no":96,"manager":"이중섭 대리","name":"원주무실점","region":"강원","months":[43712024,49785436,40109308,45618552,42107816,0,0,0,0,0,0,0]},{"no":97,"manager":"임도형 과장","name":"구미옥계점","region":"경북","months":[13030088,15187558,16488592,19739414,15098460,0,0,0,0,0,0,0]},{"no":98,"manager":"박영태 대리","name":"분당정자점","region":"경기","months":[21877414,21021208,22847172,24503018,24719420,0,0,0,0,0,0,0]},{"no":99,"manager":"강동우 사원","name":"시흥배곧점","region":"경기","months":[38794382,38716496,39437230,37016476,43445248,0,0,0,0,0,0,0]},{"no":100,"manager":"임도형 과장","name":"구미봉곡점","region":"경북","months":[17612640,25001814,18790420,22595708,15976180,0,0,0,0,0,0,0]},{"no":101,"manager":"임도형 과장","name":"대구감삼점","region":"대구","months":[37128512,42849356,34256858,40935782,49230516,0,0,0,0,0,0,0]},{"no":102,"manager":"박영태 대리","name":"DMC점","region":"서울","months":[26692280,32351570,21051770,24042694,27703068,0,0,0,0,0,0,0]},{"no":103,"manager":"박영태 대리","name":"왕십리점","region":"서울","months":[26168428,66008452,39025185,24294487,22715900,0,0,0,0,0,0,0]},{"no":104,"manager":"박영태 대리","name":"강남역점","region":"서울","months":[57824354,53732946,66922947,58757700,52552816,0,0,0,0,0,0,0]},{"no":105,"manager":"이중섭 대리","name":"인천논현점","region":"인천","months":[22213024,22847412,23434648,20498920,30378628,0,0,0,0,0,0,0]},{"no":106,"manager":"박영태 대리","name":"화곡역점","region":"서울","months":[14783124,27099332,30618026,30578886,28073758,0,0,0,0,0,0,0]},{"no":107,"manager":"임시매장","name":"울산구영점","region":"울산","months":[9393544,12385504,14805728,11841080,14865020,0,0,0,0,0,0,0]},{"no":108,"manager":"임시매장","name":"김해율하점","region":"경남","months":[12857048,17100656,17038020,13694260,13461120,0,0,0,0,0,0,0]},{"no":109,"manager":"강동우 사원","name":"풍동점","region":"경기","months":[20184524,19335660,21365504,21253292,24618268,0,0,0,0,0,0,0]},{"no":110,"manager":"이중섭 대리","name":"대전둔산점","region":"대전","months":[41021759,34725772,30934760,32750490,25442932,0,0,0,0,0,0,0]},{"no":111,"manager":"임도형 과장","name":"오산세교점","region":"경기","months":[20853440,25728500,26874096,23167794,28134719,0,0,0,0,0,0,0]},{"no":112,"manager":"임도형 과장","name":"상주점","region":"경북","months":[12752230,12116060,14349650,11543248,14360876,0,0,0,0,0,0,0]},{"no":113,"manager":"박영태 대리","name":"대치점","region":"서울","months":[25998002,24229168,26631512,20969726,21707384,0,0,0,0,0,0,0]},{"no":114,"manager":"임도형 과장","name":"경주용황점","region":"경북","months":[20704776,27189120,18490368,19630840,22998940,0,0,0,0,0,0,0]},{"no":115,"manager":"임시매장","name":"창원중동점","region":"경남","months":[21228556,25116492,18047472,14774888,14506064,0,0,0,0,0,0,0]},{"no":116,"manager":"임도형 과장","name":"수성범어점","region":"대구","months":[32484084,32909188,31938976,32085168,30137592,0,0,0,0,0,0,0]},{"no":117,"manager":"임도형 과장","name":"아산탕정신도시점","region":"충남","months":[18768628,26021420,25014920,28934240,25833540,0,0,0,0,0,0,0]},{"no":118,"manager":"박영태 대리","name":"구로디지털점","region":"서울","months":[17776650,16155412,18864672,20330768,17217912,0,0,0,0,0,0,0]},{"no":119,"manager":"강동우 사원","name":"시흥은계점","region":"경기","months":[8028088,20144744,13210140,10577480,9288596,0,0,0,0,0,0,0]},{"no":120,"manager":"강동우 사원","name":"화정점","region":"경기","months":[20464212,20691512,18751996,17747800,24080400,0,0,0,0,0,0,0]},{"no":121,"manager":"임도형 과장","name":"지산범물점","region":"대구","months":[20232612,26463708,13282128,15358580,17757484,0,0,0,0,0,0,0]},{"no":122,"manager":"임도형 과장","name":"홍성내포점","region":"충남","months":[21185916,25159208,25009868,19865980,19832280,0,0,0,0,0,0,0]},{"no":123,"manager":"임도형 과장","name":"포항이동점","region":"경북","months":[22731060,19738880,21157236,16751096,20263560,0,0,0,0,0,0,0]},{"no":124,"manager":"이중섭 대리","name":"대전관평점","region":"대전","months":[30441560,32881884,31361256,29381784,28230724,0,0,0,0,0,0,0]},{"no":125,"manager":"임시매장","name":"호매실점","region":"경기","months":[24406139,28287214,24245765,20422410,24342344,0,0,0,0,0,0,0]},{"no":126,"manager":"이중섭 대리","name":"논산점","region":"충남","months":[16419121,14730200,16540840,13200312,15392720,0,0,0,0,0,0,0]},{"no":127,"manager":"김태환 과장","name":"오창점","region":"충북","months":[12360000,22876988,16893696,15547400,15902968,0,0,0,0,0,0,0]},{"no":128,"manager":"임시매장","name":"우정혁신점","region":"울산","months":[23232228,25620060,26193608,22918796,23451140,0,0,0,0,0,0,0]},{"no":129,"manager":"임도형 과장","name":"화성봉담2지구점","region":"경기","months":[19296968,19619120,21708516,15975480,19675169,0,0,0,0,0,0,0]},{"no":130,"manager":"강동우 사원","name":"상봉역점","region":"서울","months":[26917888,24187984,27186966,21190732,21966964,0,0,0,0,0,0,0]},{"no":131,"manager":"임시매장","name":"강동구청점","region":"서울","months":[34914688,27887416,41306740,37393600,29593724,0,0,0,0,0,0,0]},{"no":132,"manager":"이중섭 대리","name":"군산조촌점","region":"전북","months":[23642592,28598820,32149756,26824628,31057220,0,0,0,0,0,0,0]},{"no":133,"manager":"강동우 사원","name":"월곡점","region":"서울","months":[34652928,30809068,24115016,25376984,30649215,0,0,0,0,0,0,0]},{"no":134,"manager":"박영태 대리","name":"사당역점","region":"서울","months":[32223018,29631732,29402656,31694912,23284476,0,0,0,0,0,0,0]},{"no":135,"manager":"강동우 사원","name":"일산동구청점","region":"경기","months":[20550024,22465528,29818414,28360458,27270613,0,0,0,0,0,0,0]},{"no":136,"manager":"강동우 사원","name":"구파발역점","region":"서울","months":[11366978,20291044,13489080,14060128,16903644,0,0,0,0,0,0,0]},{"no":137,"manager":"박영태 대리","name":"경복궁역점","region":"서울","months":[43927094,58155064,49610540,46393352,37590712,0,0,0,0,0,0,0]},{"no":138,"manager":"박영태 대리","name":"여의도점","region":"서울","months":[43768526,41934288,36507012,41869984,32842372,0,0,0,0,0,0,0]},{"no":139,"manager":"박영태 대리","name":"서대문역점","region":"서울","months":[33034062,28458238,31705120,28435640,22519188,0,0,0,0,0,0,0]},{"no":140,"manager":"이중섭 대리","name":"송도스마트스퀘어점","region":"인천","months":[21528768,18707756,20095448,20286592,14207680,0,0,0,0,0,0,0]},{"no":141,"manager":"임시매장","name":"창원시청점","region":"경남","months":[26266060,23601264,24172696,20582452,20721540,0,0,0,0,0,0,0]},{"no":142,"manager":"강동우 사원","name":"파주교하점","region":"경기","months":[22094266,21566772,20072740,20597392,20607226,0,0,0,0,0,0,0]},{"no":143,"manager":"박영태 대리","name":"서울대입구역점","region":"서울","months":[22714932,37383829,30037872,29150110,27128248,0,0,0,0,0,0,0]},{"no":144,"manager":"임도형 과장","name":"대구청라언덕점","region":"대구","months":[20305928,18328748,18904060,18499648,20487288,0,0,0,0,0,0,0]},{"no":145,"manager":"박영태 대리","name":"동작구청점","region":"서울","months":[15626320,14686700,13977144,11391808,13757156,0,0,0,0,0,0,0]},{"no":146,"manager":"박영태 대리","name":"삼성중앙역점","region":"서울","months":[0,0,20922308,20838894,18472188,0,0,0,0,0,0,0]},{"no":147,"manager":"김태환 과장","name":"순천신대점","region":"전남","months":[0,0,12517800,22013868,23501440,0,0,0,0,0,0,0]},{"no":148,"manager":"박영태 대리","name":"을지로3가점","region":"서울","months":[0,0,10242410,31603024,23783200,0,0,0,0,0,0,0]},{"no":149,"manager":"박영태 대리","name":"분당야탑점","region":"경기","months":[0,0,0,10918048,22462714,0,0,0,0,0,0,0]},{"no":150,"manager":"임도형 과장","name":"포항문덕점","region":"경북","months":[0,0,0,19476260,24621468,0,0,0,0,0,0,0]}];
+  ALL=data26.filter(d=>d.months.some(v=>v>0));
+  currentFilter='all';
+  currentRegion='all';
   renderTabs();
   renderRegionTabs();
   render();
-  document.getElementById('lastUpdate').textContent = 'sales_data.csv · 2025년 5월 기준 데이터 (150개 매장)';
+  document.getElementById('lastUpdate').textContent='26년(1~5월) + 25년 연간 데이터 · '+ALL.length+'개 매장';
 })();
 </script>
 </body>
