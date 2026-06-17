@@ -183,9 +183,20 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;">담당자</span>
     <div class="tabs" id="tabs" style="margin-bottom:0;"></div>
   </div>
-  <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
     <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;">지&nbsp;&nbsp;&nbsp;&nbsp;역</span>
     <div class="tabs" id="regionTabs" style="margin-bottom:0;"></div>
+  </div>
+  <!-- 매장 검색 -->
+  <div style="position:relative;margin-bottom:14px;max-width:280px;">
+    <span style="font-size:10px;color:#6b8fa8;position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;">🔍</span>
+    <input id="branchSearch" type="text" placeholder="매장명 검색..." autocomplete="off"
+      style="width:100%;padding:6px 32px 6px 28px;background:#1a2f44;border:0.5px solid #2a5a8a;border-radius:7px;color:#e0f0ff;font-size:11px;outline:none;"
+      oninput="onSearchInput(this.value)"
+      onfocus="showSuggestions(this.value)"
+      onblur="setTimeout(hideSuggestions,150)">
+    <button id="searchClear" onclick="clearSearch()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#6b8fa8;cursor:pointer;font-size:13px;line-height:1;">✕</button>
+    <div id="searchSuggestions" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#111e2e;border:0.5px solid #2a5a8a;border-radius:7px;z-index:500;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
   </div>
 
   <!-- KPI -->
@@ -285,6 +296,7 @@ let ALL = [];       // 26년 데이터
 let ALL25 = {};     // 25년 데이터 {name: months[]}
 let currentFilter = 'all';
 let currentRegion = 'all';
+let currentSearch = '';
 let charts = {};
 
 function fmt(n){ return Math.round(n/10000).toLocaleString()+'만원'; }
@@ -344,6 +356,7 @@ function parseCSV(text){
 function filtered(){
   let d = currentFilter==='all' ? ALL : ALL.filter(b=>b.manager===currentFilter);
   if(currentRegion!=='all') d = d.filter(b=>b.region===currentRegion);
+  if(currentSearch) d = d.filter(b=>b.name.includes(currentSearch));
   return d;
 }
 
@@ -395,6 +408,49 @@ function renderRegionTabs(){
 
 function setRegion(r){
   currentRegion=r;
+  render();
+}
+
+function onSearchInput(val){
+  currentSearch=val.trim();
+  document.getElementById('searchClear').style.display=currentSearch?'block':'none';
+  showSuggestions(val);
+  render();
+}
+
+function showSuggestions(val){
+  const box=document.getElementById('searchSuggestions');
+  const q=val.trim();
+  if(!q){ box.style.display='none'; return; }
+  const matches=ALL.filter(b=>b.name.includes(q)).slice(0,10);
+  if(!matches.length){ box.style.display='none'; return; }
+  box.innerHTML=matches.map(b=>`
+    <div onclick="selectBranch('${b.name.replace(/'/g,"\\'")}')"
+      style="padding:7px 12px;font-size:11px;color:#c8dff0;cursor:pointer;border-bottom:0.5px solid #1a2f44;"
+      onmouseover="this.style.background='#1a3a5c'" onmouseout="this.style.background=''">
+      <span style="color:#e0f0ff;font-weight:600;">${b.name}</span>
+      <span style="color:#6b8fa8;font-size:10px;margin-left:6px;">${b.manager} · ${b.region}</span>
+    </div>`).join('');
+  box.style.display='block';
+}
+
+function hideSuggestions(){
+  document.getElementById('searchSuggestions').style.display='none';
+}
+
+function selectBranch(name){
+  currentSearch=name;
+  document.getElementById('branchSearch').value=name;
+  document.getElementById('searchClear').style.display='block';
+  hideSuggestions();
+  render();
+}
+
+function clearSearch(){
+  currentSearch='';
+  document.getElementById('branchSearch').value='';
+  document.getElementById('searchClear').style.display='none';
+  hideSuggestions();
   render();
 }
 
@@ -1060,6 +1116,9 @@ function loadCSV(text, filename){
   if(!parsed.length){ alert('CSV 파싱 실패'); return; }
   ALL=parsed;
   currentFilter='all';
+  currentSearch='';
+  document.getElementById('branchSearch').value='';
+  document.getElementById('searchClear').style.display='none';
   renderTabs();
   renderRegionTabs();
   render();
