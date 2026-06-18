@@ -1001,8 +1001,9 @@ function render(){
     });
   });
 
-  document.getElementById('k1').textContent=data.length+'개';
-  document.getElementById('k1s').textContent='전체 '+ALL.length+'개 중';
+  const activeCount=data.filter(b=>(b.months[lastIdx]||0)>0).length;
+  document.getElementById('k1').textContent=activeCount+'개';
+  document.getElementById('k1s').textContent='전체 '+ALL.filter(b=>(b.months[lastIdx]||0)>0).length+'개 중';
   document.getElementById('k2l').textContent=monthLabel+' 평균 매출';
   document.getElementById('k2').textContent=fmt(avgVal);
   const avgGoal=data.reduce((s,b)=>s+getGoal(b.name,lastIdx),0)/data.length;
