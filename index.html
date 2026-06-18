@@ -263,31 +263,41 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     </div>
   </div>
 
-  <!-- 물류 대비 매장 수 분포 섹션 -->
+  <!-- 물류 비중 분석 섹션 -->
   <div style="margin-top:20px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
     <div style="width:3px;height:16px;background:#a78bfa;border-radius:2px;"></div>
-    <span style="font-size:12px;color:#a78bfa;font-weight:600;">물류 비중 분석</span>
+    <span style="font-size:12px;color:#a78bfa;font-weight:600;">물류 비중 분석 (매출 대비 물류비)</span>
   </div>
   <div class="card" style="border-color:#3a2a5a;">
     <div class="ctitle">
-      <span id="logRatioTitle">물류 대비 매출 비중별 매장 수 분포 <span style="font-size:10px;color:#6b8fa8;">(클릭하면 해당 구간 매장·월 상세 확인)</span></span>
-      <select class="filter-sel" id="logMonthSel" onchange="renderLogRatio()">
-        <option value="-1">전월 평균</option>
-        <option value="0">1월</option>
-        <option value="1">2월</option>
-        <option value="2">3월</option>
-        <option value="3">4월</option>
-        <option value="4">5월</option>
-      </select>
+      <span id="logChartTitle">물류 비중 구간별 매장 수</span>
+      <!-- 월 탭 -->
+      <div id="logMonthTabs" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;">
-      <div>
-        <div style="position:relative;height:220px;"><canvas id="logRatioChart" role="img" aria-label="물류 비중 분포"></canvas></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
+      <!-- 차트 -->
+      <div style="position:relative;height:240px;">
+        <canvas id="logRatioChart"></canvas>
       </div>
-      <div id="logRatioSummary" style="overflow-y:auto;max-height:220px;padding-right:2px;"></div>
+      <!-- 수치 표 -->
+      <div id="logRatioTable" style="overflow-y:auto;max-height:240px;"></div>
+    </div>
+    <div style="font-size:9px;color:#4a6070;margin-top:8px;">
+      ※ 비중 색상: <span style="color:#3db87a">■ ~25%</span> <span style="color:#f0a04a">■ 25~35%</span> <span style="color:#e05555">■ 35%↑</span>
+      &nbsp;· 막대 또는 표 행 클릭 시 해당 구간 매장 목록
     </div>
   </div>
 
+</div>
+
+<!-- 물류 비중 구간 매장 목록 모달 -->
+<div class="kpi-modal-overlay" id="logBucketModal">
+  <div class="kpi-modal-box" style="max-width:640px;">
+    <button class="kpi-modal-close" onclick="document.getElementById('logBucketModal').classList.remove('open')">✕</button>
+    <div class="kpi-modal-title" id="logBucketModalTitle">-</div>
+    <div class="kpi-modal-sub" id="logBucketModalSub">-</div>
+    <div class="kpi-modal-list" id="logBucketModalList"></div>
+  </div>
 </div>
 
 <!-- KPI 매장 목록 모달 -->
@@ -297,16 +307,6 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     <div class="kpi-modal-title" id="kpiModalTitle">-</div>
     <div class="kpi-modal-sub" id="kpiModalSub">-</div>
     <div class="kpi-modal-list" id="kpiModalList"></div>
-  </div>
-</div>
-
-<!-- 물류 비중 구간 매장 모달 -->
-<div class="kpi-modal-overlay" id="logRatioModal">
-  <div class="kpi-modal-box" style="max-width:700px;">
-    <button class="kpi-modal-close" onclick="closeLogRatioModal()">✕</button>
-    <div class="kpi-modal-title" id="logRatioModalTitle">-</div>
-    <div class="kpi-modal-sub" id="logRatioModalSub">-</div>
-    <div class="kpi-modal-list" id="logRatioModalList"></div>
   </div>
 </div>
 
@@ -989,7 +989,7 @@ function render(){
   renderPie(data, lastIdx);
   renderMgr(data, lastIdx);
   renderRegionAvg(data, lastIdx);
-  renderLogRatio();
+  renderLogChart();
   document.getElementById('distTitle').textContent=`매출 구간 분포 (${monthLabel} 기준)`;
   document.getElementById('rankTitle').textContent=`${monthLabel} 매출 순위 (상위 15개)`;
 
@@ -1179,202 +1179,198 @@ document.getElementById('branchModal').addEventListener('click',function(e){
   if(e.target===this) closeModal();
 });
 
-function closeLogRatioModal(){
-  document.getElementById('logRatioModal').classList.remove('open');
-}
-document.getElementById('logRatioModal').addEventListener('click',function(e){
-  if(e.target===this) closeLogRatioModal();
-});
+// ── 물류 비중 분석 ───────────────────────────────────────────
+const LOG_BUCKETS = [
+  {label:'~10%',   min:0,   max:10,  color:'rgba(61,184,122,0.85)'},
+  {label:'10~20%', min:10,  max:20,  color:'rgba(80,200,130,0.85)'},
+  {label:'20~30%', min:20,  max:30,  color:'rgba(251,191,36,0.85)'},
+  {label:'30~40%', min:30,  max:40,  color:'rgba(245,158,11,0.85)'},
+  {label:'40~50%', min:40,  max:50,  color:'rgba(249,115,22,0.85)'},
+  {label:'50~60%', min:50,  max:60,  color:'rgba(239,68,68,0.85)'},
+  {label:'60~70%', min:60,  max:70,  color:'rgba(220,38,38,0.85)'},
+  {label:'70~80%', min:70,  max:80,  color:'rgba(185,28,28,0.85)'},
+  {label:'80~90%', min:80,  max:90,  color:'rgba(153,27,27,0.85)'},
+  {label:'90~100%',min:90,  max:100, color:'rgba(127,29,29,0.85)'},
+  {label:'100%초과',min:100, max:Infinity, color:'rgba(100,20,20,0.85)'},
+];
+let logSelMonthIdx = -1; // -1 = 평균
+let logChartInst = null;
 
-// 물류 대비 매출 비중 분포 렌더링
-let logRatioChartInst = null;
-function renderLogRatio(){
+function initLogMonthTabs(){
+  const data = filtered();
+  const activeIdxs = MONTHS.map((_,i)=>i).filter(i=>data.some(b=>b.months[i]>0));
+  const el = document.getElementById('logMonthTabs');
+  const tabs = [{label:'평균', idx:-1}, ...activeIdxs.map(i=>({label:MONTHS[i], idx:i}))];
+  el.innerHTML = tabs.map(t=>`
+    <div onclick="setLogMonth(${t.idx})" id="logTab_${t.idx==-1?'avg':t.idx}"
+      style="font-size:10px;padding:3px 9px;border-radius:5px;cursor:pointer;border:0.5px solid #3a2a5a;
+      color:${logSelMonthIdx===t.idx?'#e0f0ff':'#a78bfa'};
+      background:${logSelMonthIdx===t.idx?'rgba(168,85,247,0.25)':'transparent'};
+      transition:all .15s;">
+      ${t.label}
+    </div>`).join('');
+}
+
+function setLogMonth(idx){
+  logSelMonthIdx = idx;
+  initLogMonthTabs();
+  renderLogChart();
+}
+
+function renderLogChart(){
   const LOGISTICS = window.LOGISTICS || {};
   const data = filtered();
   if(!data.length) return;
+  initLogMonthTabs();
 
-  const monthSelEl = document.getElementById('logMonthSel');
-  const selVal = monthSelEl ? parseInt(monthSelEl.value) : -1;
+  const fmtM = v => v>0 ? Math.round(v/10000).toLocaleString()+'만원' : '-';
 
-  // 구간 정의: 10% 단위 (0~10%, 10~20%, ..., 90~100%, 100%초과)
-  const BUCKETS = [
-    {label:'~10%',  min:0,   max:10},
-    {label:'10~20%',min:10,  max:20},
-    {label:'20~30%',min:20,  max:30},
-    {label:'30~40%',min:30,  max:40},
-    {label:'40~50%',min:40,  max:50},
-    {label:'50~60%',min:50,  max:60},
-    {label:'60~70%',min:60,  max:70},
-    {label:'70~80%',min:70,  max:80},
-    {label:'80~90%',min:80,  max:90},
-    {label:'90~100%',min:90, max:100},
-    {label:'100%초과',min:100,max:Infinity},
-  ];
-
-  // 각 매장·월의 물류비중 계산
-  // selVal === -1: 각 매장별로 유효한 월들의 평균 비중
-  const storeRatios = []; // {name, manager, region, ratio, month, sales, logistics}
+  // 각 매장의 해당 월(또는 평균) 비중 계산
+  const storeRatios = [];
   data.forEach(b=>{
     const logArr = LOGISTICS[b.name];
     if(!logArr) return;
-    if(selVal === -1){
-      // 전체 유효 월 평균
-      let sumSales=0, sumLog=0, cnt=0;
-      b.months.forEach((sv,i)=>{
-        const lv = logArr[i]||0;
-        if(sv>0 && lv>0){ sumSales+=sv; sumLog+=lv; cnt++; }
-      });
-      if(cnt>0 && sumSales>0){
-        storeRatios.push({
-          name:b.name, manager:b.manager, region:b.region,
-          ratio: sumLog/sumSales*100,
-          month:'평균', sales:sumSales/cnt, logistics:sumLog/cnt
-        });
-      }
+    if(logSelMonthIdx === -1){
+      let sumS=0, sumL=0;
+      b.months.forEach((sv,i)=>{ const lv=logArr[i]||0; if(sv>0&&lv>0){sumS+=sv;sumL+=lv;} });
+      if(sumS>0&&sumL>0) storeRatios.push({name:b.name, manager:b.manager, region:b.region,
+        ratio:sumL/sumS*100, sales:sumS, logistics:sumL, month:'평균'});
     } else {
-      const sv = b.months[selVal]||0;
-      const lv = logArr[selVal]||0;
-      if(sv>0 && lv>0){
-        storeRatios.push({
-          name:b.name, manager:b.manager, region:b.region,
-          ratio: lv/sv*100,
-          month: MONTHS[selVal], sales:sv, logistics:lv
-        });
-      }
+      const sv = b.months[logSelMonthIdx]||0;
+      const lv = logArr[logSelMonthIdx]||0;
+      if(sv>0&&lv>0) storeRatios.push({name:b.name, manager:b.manager, region:b.region,
+        ratio:lv/sv*100, sales:sv, logistics:lv, month:MONTHS[logSelMonthIdx]});
     }
   });
 
-  // 구간별 매장 모음
-  const bucketData = BUCKETS.map(bk=>{
-    const items = storeRatios.filter(s=>s.ratio>=bk.min && s.ratio<bk.max);
-    return {...bk, items, count:items.length};
-  });
+  // 구간별 분류
+  const buckets = LOG_BUCKETS.map(bk=>({
+    ...bk,
+    items: storeRatios.filter(s=>s.ratio>=bk.min && s.ratio<bk.max)
+  }));
+  const nonEmpty = buckets.filter(b=>b.items.length>0);
+  const counts = buckets.map(b=>b.items.length);
+  const totalStores = storeRatios.length;
+  const monthLabel = logSelMonthIdx===-1?'평균':MONTHS[logSelMonthIdx];
 
-  const counts = bucketData.map(b=>b.count);
-  const colors = BUCKETS.map((_,i)=>{
-    const pct = i/10;
-    // 초록 → 노랑 → 빨강 그라데이션
-    if(i<=3) return `rgba(61,184,122,${0.6+i*0.05})`;
-    if(i<=6) return `rgba(240,160,74,${0.55+i*0.04})`;
-    return `rgba(224,85,85,${0.6+(i-7)*0.08})`;
-  });
+  document.getElementById('logChartTitle').textContent = `물류 비중 구간별 매장 수 · ${monthLabel} 기준 (총 ${totalStores}개)`;
 
-  if(logRatioChartInst){ logRatioChartInst.destroy(); logRatioChartInst=null; }
-  logRatioChartInst = new Chart(document.getElementById('logRatioChart'),{
+  // ── 차트 ──
+  if(logChartInst){ logChartInst.destroy(); logChartInst=null; }
+  logChartInst = new Chart(document.getElementById('logRatioChart'),{
     type:'bar',
     data:{
-      labels: BUCKETS.map(b=>b.label),
+      labels: LOG_BUCKETS.map(b=>b.label),
       datasets:[{
         data: counts,
-        backgroundColor: colors,
-        borderColor: colors.map(c=>c.replace(/[\d.]+\)$/,'0.95)')),
-        borderWidth:1, borderRadius:4
+        backgroundColor: LOG_BUCKETS.map(b=>b.color),
+        borderColor: LOG_BUCKETS.map(b=>b.color.replace('0.85','1')),
+        borderWidth:1, borderRadius:5, borderSkipped:false
       }]
     },
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{
         datalabels:{
-          display:true,
+          display:ctx=>counts[ctx.dataIndex]>0,
           anchor:'end', align:'top',
-          formatter:v=>v>0?v+'개':'',
-          color:'#aac4e0', font:{size:10,weight:'bold'}
+          formatter:v=>v+'개',
+          color:'#e0f0ff', font:{size:10,weight:'bold'}
         },
         legend:{display:false},
-        tooltip:{
-          callbacks:{
-            title:t=>t[0].label+' 구간',
-            label:c=>c.parsed.y+'개 매장 (클릭하여 상세 보기)'
+        tooltip:{callbacks:{
+          title:t=>t[0].label+' 구간',
+          label:c=>{
+            const bk=buckets[c.dataIndex];
+            const avg = bk.items.length>0?(bk.items.reduce((s,x)=>s+x.ratio,0)/bk.items.length).toFixed(1):'0';
+            return [`${c.parsed.y}개 매장`, `평균 비중: ${avg}%`];
           }
-        }
+        }}
       },
       scales:{
-        x:{ticks:{color:'#6b8fa8',font:{size:9},maxRotation:30},grid:{display:false}},
-        y:{
-          min:0,
+        x:{ticks:{color:'#a78bfa',font:{size:9},maxRotation:35}, grid:{display:false}},
+        y:{min:0,
           ticks:{color:'#6b8fa8',font:{size:10},callback:v=>Number.isInteger(v)?v+'개':''},
-          grid:{color:'#1a2f44'}
+          grid:{color:'#1a2f44'},
+          afterDataLimits:s=>{s.max=Math.max(s.max,1)+Math.ceil(s.max*0.2);}
         }
       },
       onClick:(e,els)=>{
         if(!els.length) return;
-        const bk = bucketData[els[0].index];
-        openLogRatioModal(bk, selVal);
+        openLogBucketModal(buckets[els[0].index], monthLabel);
       },
-      onHover:(e,els)=>{
-        e.native.target.style.cursor = els.length?'pointer':'default';
-      }
+      onHover:(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; }
     }
   });
 
-  // 요약 테이블 (오른쪽)
-  const fmtD=v=>{
-    if(!v||v<=0) return '-';
-    if(v>=10000){const u=Math.floor(v/10000),r=Math.round(v%10000/1000);return r>0?`${u}억 ${r}천만`:`${u}억`;}
-    return Math.round(v/10000).toLocaleString()+'만원';
-  };
-  const nonEmpty = bucketData.filter(b=>b.count>0);
-  const summaryHTML = nonEmpty.map(bk=>{
-    const avgRatio = bk.items.length>0 ? (bk.items.reduce((s,x)=>s+x.ratio,0)/bk.items.length).toFixed(1) : '-';
-    const ratioColor = bk.min<30?'#3db87a':bk.min<60?'#f0a04a':'#e05555';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:6px;margin-bottom:4px;background:#0d1b2a;border:0.5px solid #1a2f44;cursor:pointer;"
-      onclick="openLogRatioModal(window.__logBucketData?window.__logBucketData[${bucketData.indexOf(bk)}]:null, ${selVal})">
-      <div style="display:flex;align-items:center;gap:7px;">
-        <div style="width:8px;height:8px;border-radius:50%;background:${ratioColor};flex-shrink:0;"></div>
-        <span style="font-size:11px;color:#c8dff0;font-weight:500;">${bk.label}</span>
+  // ── 오른쪽 수치 표 ──
+  const tableRows = nonEmpty.map(bk=>{
+    const avg = (bk.items.reduce((s,x)=>s+x.ratio,0)/bk.items.length).toFixed(1);
+    const pct = totalStores>0?Math.round(bk.items.length/totalStores*100):0;
+    const barW = totalStores>0?Math.round(bk.items.length/Math.max(...counts)*100):0;
+    const bc = bk.min<25?'#3db87a':bk.min<40?'#f0a04a':'#e05555';
+    const bIdx = buckets.indexOf(bk);
+    return `<div onclick="openLogBucketModal(window.__logBuckets&&window.__logBuckets[${bIdx}],'${monthLabel}')"
+      style="padding:6px 10px;border-radius:7px;margin-bottom:4px;background:#0d1b2a;border:0.5px solid #1a2f44;cursor:pointer;transition:background .15s;"
+      onmouseover="this.style.background='#172840'" onmouseout="this.style.background='#0d1b2a'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:8px;height:8px;border-radius:2px;background:${bk.color};flex-shrink:0;"></div>
+          <span style="font-size:11px;color:#c8dff0;font-weight:500;">${bk.label}</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:6px;">
+          <span style="font-size:14px;font-weight:700;color:#e0f0ff;">${bk.items.length}개</span>
+          <span style="font-size:9px;color:#6b8fa8;">${pct}%</span>
+        </div>
       </div>
-      <div style="text-align:right;">
-        <span style="font-size:12px;font-weight:700;color:#e0f0ff;">${bk.count}개</span>
-        <span style="font-size:9px;color:#6b8fa8;margin-left:5px;">평균 ${avgRatio}%</span>
+      <div style="background:#1a2f44;border-radius:2px;height:3px;margin-bottom:3px;">
+        <div style="width:${barW}%;height:3px;border-radius:2px;background:${bc};transition:width .6s;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="font-size:9px;color:#6b8fa8;">평균 ${avg}%</span>
+        <span style="font-size:9px;color:#a78bfa;">클릭하여 매장 목록 ›</span>
       </div>
     </div>`;
   }).join('');
 
-  document.getElementById('logRatioSummary').innerHTML = nonEmpty.length
-    ? `<div style="font-size:10px;color:#6b8fa8;margin-bottom:6px;">구간별 매장 수 · 클릭하여 상세 보기</div>${summaryHTML}`
-    : `<div style="font-size:11px;color:#6b8fa8;padding:16px;text-align:center;">물류 데이터가 있는 매장이 없습니다</div>`;
+  document.getElementById('logRatioTable').innerHTML = totalStores>0
+    ? tableRows
+    : '<div style="padding:20px;text-align:center;font-size:11px;color:#6b8fa8;">해당 월 물류 데이터 없음</div>';
 
-  window.__logBucketData = bucketData;
-
-  // 타이틀 업데이트
-  const monthLabel = selVal===-1?'전월 평균':MONTHS[selVal];
-  document.getElementById('logRatioTitle').innerHTML =
-    `물류 대비 매출 비중별 매장 수 (${monthLabel}) <span style="font-size:10px;color:#6b8fa8;">· 클릭하면 상세</span>`;
+  window.__logBuckets = buckets;
 }
 
-function openLogRatioModal(bk, selVal){
-  if(!bk||!bk.items||!bk.items.length){return;}
-  const monthLabel = selVal===-1?'전월 평균':MONTHS[selVal];
-  document.getElementById('logRatioModalTitle').textContent=`물류 비중 ${bk.label} 구간 매장 (${monthLabel})`;
-  document.getElementById('logRatioModalSub').textContent=`총 ${bk.items.length}개 매장 · 물류(VAT포함) ÷ 매출액 기준`;
-
+function openLogBucketModal(bk, monthLabel){
+  if(!bk||!bk.items||!bk.items.length) return;
   const sorted = [...bk.items].sort((a,b)=>a.ratio-b.ratio);
-  const fmtD=v=>{
-    if(!v||v<=0) return '-';
-    if(v>=10000){const u=Math.floor(v/10000),r=Math.round(v%10000/1000);return r>0?`${u}억 ${r}천만`:`${u}억`;}
-    return Math.round(v/10000).toLocaleString()+'만원';
-  };
+  const fmtM = v => v>0 ? Math.round(v/10000).toLocaleString()+'만원' : '-';
+  const bc = bk.min<25?'#3db87a':bk.min<40?'#f0a04a':'#e05555';
 
-  document.getElementById('logRatioModalList').innerHTML = sorted.map((s,i)=>{
-    const ratioColor = s.ratio<30?'#3db87a':s.ratio<60?'#f0a04a':'#e05555';
-    return `<div class="kml-item" style="cursor:pointer;" onclick="closeLogRatioModal();const b=window.__allMap&&window.__allMap['${s.name}'];if(b)openBranchModal(b);">
+  document.getElementById('logBucketModalTitle').textContent = `${bk.label} 구간 매장 · ${monthLabel}`;
+  document.getElementById('logBucketModalSub').textContent = `총 ${bk.items.length}개 매장 · 물류(VAT포함) ÷ 매출`;
+
+  document.getElementById('logBucketModalList').innerHTML = sorted.map((s,i)=>`
+    <div class="kml-item" style="cursor:pointer;"
+      onclick="document.getElementById('logBucketModal').classList.remove('open');const b=window.__allMap&&window.__allMap['${s.name.replace(/'/g,"\\'")}'];if(b)openBranchModal(b);">
       <div class="kml-left">
         <span class="kml-rank">${i+1}</span>
         <div>
           <div class="kml-name">${s.name}</div>
-          <div class="kml-mgr">${s.manager} · ${s.region} · <span style="color:#aac4e0;">${s.month}</span></div>
+          <div class="kml-mgr">${s.manager} · ${s.region}</div>
         </div>
       </div>
       <div class="kml-right">
-        <div style="font-size:13px;font-weight:700;color:${ratioColor};">${s.ratio.toFixed(1)}%</div>
-        <div style="font-size:10px;color:#a78bfa;margin-top:2px;">물류 ${fmtD(s.logistics)}</div>
-        <div style="font-size:10px;color:#6b8fa8;">매출 ${fmtD(s.sales)}</div>
+        <div style="font-size:14px;font-weight:700;color:${bc};">${s.ratio.toFixed(1)}%</div>
+        <div style="font-size:10px;color:#a78bfa;margin-top:2px;">물류 ${fmtM(s.logistics)}</div>
+        <div style="font-size:10px;color:#38bdf8;">매출 ${fmtM(s.sales)}</div>
       </div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 
-  document.getElementById('logRatioModal').classList.add('open');
+  document.getElementById('logBucketModal').classList.add('open');
 }
+document.getElementById('logBucketModal').addEventListener('click',function(e){
+  if(e.target===this) this.classList.remove('open');
+});
 
 function loadCSV(text, filename){
   const parsed=parseCSV(text);
