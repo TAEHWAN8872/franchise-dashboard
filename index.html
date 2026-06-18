@@ -1182,17 +1182,16 @@ document.getElementById('branchModal').addEventListener('click',function(e){
 
 // ── 물류 비중 분석 ───────────────────────────────────────────
 const LOG_BUCKETS = [
-  {label:'~10%',   min:0,   max:10,  color:'rgba(61,184,122,0.85)'},
-  {label:'10~20%', min:10,  max:20,  color:'rgba(80,200,130,0.85)'},
-  {label:'20~30%', min:20,  max:30,  color:'rgba(251,191,36,0.85)'},
-  {label:'30~40%', min:30,  max:40,  color:'rgba(245,158,11,0.85)'},
-  {label:'40~50%', min:40,  max:50,  color:'rgba(249,115,22,0.85)'},
-  {label:'50~60%', min:50,  max:60,  color:'rgba(239,68,68,0.85)'},
-  {label:'60~70%', min:60,  max:70,  color:'rgba(220,38,38,0.85)'},
-  {label:'70~80%', min:70,  max:80,  color:'rgba(185,28,28,0.85)'},
-  {label:'80~90%', min:80,  max:90,  color:'rgba(153,27,27,0.85)'},
-  {label:'90~100%',min:90,  max:100, color:'rgba(127,29,29,0.85)'},
-  {label:'100%초과',min:100, max:Infinity, color:'rgba(100,20,20,0.85)'},
+  {label:'~10%',    min:0,   max:10,  color:'rgba(61,184,122,0.85)',  guide:'폐기 레시피 점검',      guideColor:'#3db87a'},
+  {label:'10~20%',  min:10,  max:20,  color:'rgba(80,200,130,0.85)',  guide:'폐기 레시피 점검',      guideColor:'#3db87a'},
+  {label:'20~30%',  min:20,  max:30,  color:'rgba(251,191,36,0.85)',  guide:'폐기 레시피 점검',      guideColor:'#facc15'},
+  {label:'30~32%',  min:30,  max:32,  color:'rgba(253,186,60,0.85)',  guide:'사유 확인',             guideColor:'#fbbf24'},
+  {label:'32~36%',  min:32,  max:36,  color:'rgba(245,158,11,0.85)',  guide:'정상 범위',             guideColor:'#f59e0b'},
+  {label:'36~38%',  min:36,  max:38,  color:'rgba(249,115,22,0.85)',  guide:'사유 확인',             guideColor:'#f97316'},
+  {label:'38~40%',  min:38,  max:40,  color:'rgba(234,88,12,0.85)',   guide:'폐기 및 레시피 점검',   guideColor:'#ea580c'},
+  {label:'40~50%',  min:40,  max:50,  color:'rgba(239,68,68,0.85)',   guide:'주의 — 원가율 높음',    guideColor:'#ef4444'},
+  {label:'50~60%',  min:50,  max:60,  color:'rgba(220,38,38,0.85)',   guide:'위험 — 즉시 점검 필요', guideColor:'#dc2626'},
+  {label:'60%초과', min:60,  max:Infinity, color:'rgba(153,27,27,0.85)', guide:'심각 — 운영 재검토', guideColor:'#991b1b'},
 ];
 let logSelMonthIdx = -1; // -1 = 평균
 let logChartInst = null;
@@ -1261,16 +1260,21 @@ function renderLogChart(){
 
   document.getElementById('logChartTitle').textContent = `물류 비중 구간별 매장 수 · ${monthLabel} 기준 (총 ${totalStores}개)`;
 
-  // ── 차트 ──
+  // ── 차트: 수치 있는 구간만 표시 ──
+  const visibleBuckets = buckets.filter(b=>b.items.length>0);
+  const visibleLabels  = visibleBuckets.map(b=>b.label);
+  const visibleCounts  = visibleBuckets.map(b=>b.items.length);
+  const visibleColors  = visibleBuckets.map(b=>b.color);
+
   if(logChartInst){ logChartInst.destroy(); logChartInst=null; }
   logChartInst = new Chart(document.getElementById('logRatioChart'),{
     type:'bar',
     data:{
-      labels: LOG_BUCKETS.map(b=>b.label),
+      labels: visibleLabels,
       datasets:[{
-        data: counts,
-        backgroundColor: LOG_BUCKETS.map(b=>b.color),
-        borderColor: LOG_BUCKETS.map(b=>b.color.replace('0.85','1')),
+        data: visibleCounts,
+        backgroundColor: visibleColors,
+        borderColor: visibleColors.map(c=>c.replace('0.85','1')),
         borderWidth:1, borderRadius:5, borderSkipped:false
       }]
     },
@@ -1278,7 +1282,7 @@ function renderLogChart(){
       responsive:true, maintainAspectRatio:false,
       plugins:{
         datalabels:{
-          display:ctx=>counts[ctx.dataIndex]>0,
+          display:true,
           anchor:'end', align:'top',
           formatter:v=>v+'개',
           color:'#e0f0ff', font:{size:10,weight:'bold'}
@@ -1287,9 +1291,9 @@ function renderLogChart(){
         tooltip:{callbacks:{
           title:t=>t[0].label+' 구간',
           label:c=>{
-            const bk=buckets[c.dataIndex];
-            const avg = bk.items.length>0?(bk.items.reduce((s,x)=>s+x.ratio,0)/bk.items.length).toFixed(1):'0';
-            return [`${c.parsed.y}개 매장`, `평균 비중: ${avg}%`];
+            const bk=visibleBuckets[c.dataIndex];
+            const avg=(bk.items.reduce((s,x)=>s+x.ratio,0)/bk.items.length).toFixed(1);
+            return [`${c.parsed.y}개 매장`, `평균 비중: ${avg}%`, bk.guide];
           }
         }}
       },
@@ -1298,43 +1302,46 @@ function renderLogChart(){
         y:{min:0,
           ticks:{color:'#6b8fa8',font:{size:10},callback:v=>Number.isInteger(v)?v+'개':''},
           grid:{color:'#1a2f44'},
-          afterDataLimits:s=>{s.max=Math.max(s.max,1)+Math.ceil(s.max*0.2);}
+          afterDataLimits:s=>{s.max=Math.max(s.max,1)+Math.ceil(s.max*0.25);}
         }
       },
       onClick:(e,els)=>{
         if(!els.length) return;
-        openLogBucketModal(buckets[els[0].index], monthLabel);
+        openLogBucketModal(visibleBuckets[els[0].index], monthLabel);
       },
       onHover:(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; }
     }
   });
 
-  // ── 오른쪽 수치 표 ──
-  const tableRows = nonEmpty.map(bk=>{
+  // ── 오른쪽 수치 표 (가이드 문구 포함) ──
+  const maxCount = Math.max(...visibleCounts, 1);
+  const tableRows = visibleBuckets.map(bk=>{
     const avg = (bk.items.reduce((s,x)=>s+x.ratio,0)/bk.items.length).toFixed(1);
     const pct = totalStores>0?Math.round(bk.items.length/totalStores*100):0;
-    const barW = totalStores>0?Math.round(bk.items.length/Math.max(...counts)*100):0;
-    const bc = bk.min<25?'#3db87a':bk.min<40?'#f0a04a':'#e05555';
+    const barW = Math.round(bk.items.length/maxCount*100);
     const bIdx = buckets.indexOf(bk);
+    // 30~40% 세분 구간 강조 테두리
+    const is3040 = bk.min>=30 && bk.max<=40;
     return `<div onclick="openLogBucketModal(window.__logBuckets&&window.__logBuckets[${bIdx}],'${monthLabel}')"
-      style="padding:6px 10px;border-radius:7px;margin-bottom:4px;background:#0d1b2a;border:0.5px solid #1a2f44;cursor:pointer;transition:background .15s;"
-      onmouseover="this.style.background='#172840'" onmouseout="this.style.background='#0d1b2a'">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      style="padding:6px 10px;border-radius:7px;margin-bottom:4px;background:#0d1b2a;
+             border:0.5px solid ${is3040?bk.color:'#1a2f44'};cursor:pointer;transition:background .15s;
+             ${is3040?'margin-left:8px;':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
         <div style="display:flex;align-items:center;gap:6px;">
           <div style="width:8px;height:8px;border-radius:2px;background:${bk.color};flex-shrink:0;"></div>
-          <span style="font-size:11px;color:#c8dff0;font-weight:500;">${bk.label}</span>
+          <span style="font-size:11px;color:#c8dff0;font-weight:${is3040?'700':'500'};">${bk.label}</span>
         </div>
         <div style="display:flex;align-items:baseline;gap:6px;">
           <span style="font-size:14px;font-weight:700;color:#e0f0ff;">${bk.items.length}개</span>
           <span style="font-size:9px;color:#6b8fa8;">${pct}%</span>
         </div>
       </div>
-      <div style="background:#1a2f44;border-radius:2px;height:3px;margin-bottom:3px;">
-        <div style="width:${barW}%;height:3px;border-radius:2px;background:${bc};transition:width .6s;"></div>
+      <div style="background:#1a2f44;border-radius:2px;height:3px;margin-bottom:4px;">
+        <div style="width:${barW}%;height:3px;border-radius:2px;background:${bk.color};transition:width .6s;"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:10px;font-weight:600;color:${bk.guideColor};">⚑ ${bk.guide}</span>
         <span style="font-size:9px;color:#6b8fa8;">평균 ${avg}%</span>
-        <span style="font-size:9px;color:#a78bfa;">클릭하여 매장 목록 ›</span>
       </div>
     </div>`;
   }).join('');
@@ -1355,10 +1362,11 @@ function openLogBucketModal(bk, monthLabel){
     if(m>=10000){ const u=Math.floor(m/10000),r=m%10000; return r>0?`${u}억 ${r.toLocaleString()}만원`:`${u}억`; }
     return m.toLocaleString()+'만원';
   };
-  const bc = bk.min<25?'#3db87a':bk.min<40?'#f0a04a':'#e05555';
+  const bc = bk.guideColor||'#a78bfa';
 
   document.getElementById('logBucketModalTitle').textContent = `${bk.label} 구간 매장 · ${monthLabel}`;
-  document.getElementById('logBucketModalSub').textContent = `총 ${bk.items.length}개 매장 · 물류(VAT포함) ÷ 매출`;
+  document.getElementById('logBucketModalSub').innerHTML =
+    `총 ${bk.items.length}개 매장 &nbsp;·&nbsp; <span style="color:${bc};font-weight:600;">⚑ ${bk.guide}</span>`;
 
   document.getElementById('logBucketModalList').innerHTML = sorted.map((s,i)=>`
     <div class="kml-item" style="cursor:pointer;"
@@ -1371,7 +1379,7 @@ function openLogBucketModal(bk, monthLabel){
         </div>
       </div>
       <div class="kml-right">
-        <div style="font-size:14px;font-weight:700;color:${bc};">${s.ratio.toFixed(1)}%</div>
+        <div style="font-size:14px;font-weight:700;color:${bk.guideColor};">${s.ratio.toFixed(1)}%</div>
         <div style="font-size:10px;color:#a78bfa;margin-top:2px;">물류 ${fmtM(s.logistics)}</div>
         <div style="font-size:10px;color:#38bdf8;">매출 ${fmtM(s.sales)}</div>
       </div>
