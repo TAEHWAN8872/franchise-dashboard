@@ -2724,7 +2724,7 @@ renderMenuMonthTabs();
         <div style="font-size:12px;font-weight:600;color:#a78bfa;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
           <span>🏆</span><span id="rankPanelTitle">지역별 순위</span>
         </div>
-        <div id="rankList"></div>
+        <div id="mapRankList"></div>
       </div>
     </div>
   </div>
@@ -2855,7 +2855,7 @@ function renderMap(){
   document.getElementById('rankPanelTitle').textContent = titles[tab];
 
   const rankColors = ['#fbbf24','#94a3b8','#cd7f32','#7eb8e8'];
-  document.getElementById('rankList').innerHTML = values.map((item, idx)=>{
+  document.getElementById('mapRankList').innerHTML = values.map((item, idx)=>{
     const rank = idx+1;
     const rankColor = rank<=3 ? rankColors[rank-1] : rankColors[3];
     let displayVal;
@@ -2888,8 +2888,8 @@ function renderMap(){
   values.forEach(v=>{ valueMap[v.region] = v; });
 
   container.innerHTML = `
-<svg viewBox="0 0 560 680" xmlns="http://www.w3.org/2000/svg"
-  style="width:100%;height:100%;max-height:600px;">
+<svg viewBox="0 0 460 590" xmlns="http://www.w3.org/2000/svg"
+  style="width:100%;height:100%;max-height:650px;">
   <defs>
     <filter id="glow">
       <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
@@ -2904,104 +2904,118 @@ function renderMap(){
 }
 
 function buildKoreaMapPaths(valueMap, maxVal, tab){
-  // 한국 행정구역 SVG 경로 (실제 행정 경계 기반, viewBox 0 0 560 680)
+  // 한국 행정구역 SVG 경로
+  // viewBox 0 0 460 580  (본토: y 30~490, 제주: y 520~570)
+  // 실제 지도 비율을 최대한 반영: 동쪽이 넓고, 서쪽 해안은 불규칙
   const regions = [
-    // ── 강원도 (우상단, 큰 면적) ──
+
+    // ── 강원도 (동북부, 가장 큰 도 중 하나 - 태백산맥 동쪽) ──
     {id:'gangwon', name:'강원',
-     path:`M 248 62 L 262 58 L 278 55 L 300 57 L 320 62 L 338 70 L 352 82 L 358 98 L 355 116
-           L 348 132 L 338 148 L 325 160 L 310 168 L 295 172 L 280 168 L 265 158 L 252 145
-           L 240 130 L 235 112 L 236 94 L 240 78 Z`,
-     labelX:295, labelY:115, fontSize:11},
+     path:`M 238 42 L 258 36 L 282 34 L 308 36 L 332 42 L 352 54
+           L 364 70 L 368 90 L 362 112 L 350 134 L 334 152 L 316 164
+           L 296 170 L 276 166 L 258 154 L 244 138 L 232 118 L 228 96
+           L 230 72 Z`,
+     labelX:300, labelY:108, fontSize:12},
 
-    // ── 경기도 (중서부, 서울 감싸는 형태) ──
+    // ── 경기도 (수도권, 서울·인천 감싸는 형태) ──
     {id:'gyeonggi', name:'경기',
-     path:`M 148 88 L 165 80 L 185 75 L 205 76 L 225 82 L 240 92 L 248 105 L 250 120
-           L 245 135 L 235 148 L 220 158 L 202 163 L 182 162 L 162 155 L 148 142
-           L 138 128 L 135 112 L 138 98 Z`,
-     labelX:192, labelY:122, fontSize:10},
+     path:`M 140 80 L 160 72 L 184 68 L 208 70 L 230 78 L 244 92
+           L 250 110 L 248 130 L 240 148 L 226 162 L 208 172 L 188 176
+           L 166 172 L 148 160 L 134 144 L 126 124 L 128 104 Z`,
+     labelX:190, labelY:128, fontSize:10},
 
-    // ── 서울특별시 (경기도 내부) ──
+    // ── 서울특별시 (경기 내부, 한강 중심) ──
     {id:'seoul', name:'서울',
-     path:`M 178 100 L 194 96 L 208 100 L 214 112 L 210 124 L 196 130 L 182 128 L 172 118 Z`,
-     labelX:193, labelY:114, fontSize:8},
+     path:`M 178 96 L 196 90 L 212 96 L 218 110 L 214 124 L 200 132
+           L 184 130 L 172 120 Z`,
+     labelX:196, labelY:112, fontSize:8},
 
-    // ── 인천광역시 (서쪽 해안) ──
+    // ── 인천광역시 (경기 서쪽 해안) ──
     {id:'incheon', name:'인천',
-     path:`M 132 106 L 148 100 L 160 108 L 162 122 L 154 132 L 138 134 L 128 124 Z`,
-     labelX:146, labelY:117, fontSize:8},
+     path:`M 116 106 L 136 98 L 152 104 L 158 118 L 152 132 L 136 138
+           L 120 132 L 110 120 Z`,
+     labelX:136, labelY:118, fontSize:8},
 
-    // ── 충청북도 (중부 내륙) ──
+    // ── 충청북도 (내륙, 바다 없음) ──
     {id:'chungbuk', name:'충북',
-     path:`M 202 165 L 230 158 L 255 162 L 268 175 L 270 194 L 262 212 L 244 222
-           L 222 224 L 202 216 L 190 200 L 190 182 Z`,
-     labelX:230, labelY:193, fontSize:10},
+     path:`M 224 172 L 252 164 L 278 166 L 302 176 L 316 196 L 318 220
+           L 308 244 L 288 258 L 264 262 L 240 254 L 222 236 L 216 212
+           L 218 190 Z`,
+     labelX:268, labelY:214, fontSize:10},
 
-    // ── 충청남도 (서부 해안) ──
+    // ── 충청남도 (서해안, 복잡한 해안선) ──
     {id:'chungnam', name:'충남',
-     path:`M 115 148 L 142 140 L 165 142 L 180 155 L 186 172 L 182 192 L 168 208
-           L 148 218 L 125 220 L 105 210 L 95 193 L 98 172 L 106 158 Z`,
-     labelX:140, labelY:182, fontSize:10},
+     path:`M 90 162 L 116 152 L 144 150 L 168 158 L 186 174 L 194 196
+           L 192 222 L 180 244 L 160 260 L 134 268 L 106 262 L 82 244
+           L 70 220 L 72 194 L 80 174 Z`,
+     labelX:135, labelY:210, fontSize:10},
 
-    // ── 세종특별자치시 ──
+    // ── 세종특별자치시 (충남·충북 경계) ──
     {id:'sejong', name:'세종',
-     path:`M 180 192 L 196 188 L 204 198 L 200 212 L 186 216 L 176 208 Z`,
-     labelX:190, labelY:203, fontSize:7},
+     path:`M 188 216 L 206 210 L 216 222 L 212 238 L 196 244 L 182 236 Z`,
+     labelX:200, labelY:228, fontSize:7},
 
-    // ── 대전광역시 ──
+    // ── 대전광역시 (세종 아래) ──
     {id:'daejeon', name:'대전',
-     path:`M 180 215 L 200 210 L 210 222 L 205 234 L 188 238 L 175 230 Z`,
-     labelX:192, labelY:224, fontSize:7},
+     path:`M 182 248 L 204 242 L 216 256 L 210 272 L 192 278 L 176 268 Z`,
+     labelX:198, labelY:260, fontSize:7},
 
-    // ── 경상북도 (동부 내륙, 가장 큰 면적 중 하나) ──
+    // ── 경상북도 (동부 내륙, 한반도에서 가장 넓은 도) ──
     {id:'gyeongbuk', name:'경북',
-     path:`M 265 160 L 295 155 L 322 162 L 342 178 L 352 200 L 350 224
-           L 338 245 L 318 260 L 295 265 L 270 260 L 252 245 L 242 225
-           L 242 205 L 248 185 L 255 170 Z`,
-     labelX:298, labelY:212, fontSize:11},
+     path:`M 302 168 L 332 162 L 362 168 L 390 182 L 408 204 L 414 230
+           L 410 260 L 396 284 L 374 302 L 348 312 L 318 314 L 292 304
+           L 270 286 L 258 262 L 256 236 L 264 210 L 280 190 Z`,
+     labelX:340, labelY:242, fontSize:12},
 
-    // ── 대구광역시 (경북 내부) ──
+    // ── 대구광역시 (경북 남서쪽 분지) ──
     {id:'daegu', name:'대구',
-     path:`M 272 252 L 296 248 L 310 260 L 306 276 L 288 282 L 270 274 L 264 260 Z`,
-     labelX:288, labelY:266, fontSize:8},
+     path:`M 312 286 L 340 278 L 358 292 L 356 316 L 334 326 L 312 316
+           L 304 300 Z`,
+     labelX:334, labelY:304, fontSize:8},
 
-    // ── 전라북도 (서남부) ──
+    // ── 전라북도 (서남부 내륙+해안) ──
     {id:'jeonbuk', name:'전북',
-     path:`M 120 222 L 148 216 L 172 218 L 192 228 L 205 245 L 208 265
-           L 198 282 L 176 292 L 150 292 L 126 280 L 108 262 L 108 242 Z`,
-     labelX:158, labelY:257, fontSize:10},
+     path:`M 82 268 L 114 258 L 146 260 L 172 272 L 194 292 L 202 318
+           L 196 346 L 174 364 L 146 370 L 116 360 L 88 340 L 72 314
+           L 72 288 Z`,
+     labelX:144, labelY:314, fontSize:10},
 
-    // ── 경상남도 (남동부) ──
+    // ── 경상남도 (동남부, 남해안) ──
     {id:'gyeongnam', name:'경남',
-     path:`M 250 268 L 276 262 L 308 268 L 330 282 L 340 305 L 332 328
-           L 310 342 L 284 346 L 258 334 L 240 315 L 238 292 Z`,
-     labelX:290, labelY:308, fontSize:10},
+     path:`M 264 300 L 296 292 L 328 296 L 360 312 L 382 336 L 388 364
+           L 376 390 L 352 408 L 320 416 L 290 408 L 264 388 L 248 362
+           L 246 334 L 252 312 Z`,
+     labelX:320, labelY:358, fontSize:10},
 
-    // ── 울산광역시 ──
+    // ── 울산광역시 (경남 동북쪽, 해안) ──
     {id:'ulsan', name:'울산',
-     path:`M 330 255 L 354 248 L 368 262 L 364 282 L 344 290 L 326 280 Z`,
-     labelX:348, labelY:270, fontSize:8},
+     path:`M 384 272 L 412 262 L 430 278 L 428 304 L 406 316 L 384 306
+           L 376 290 Z`,
+     labelX:406, labelY:290, fontSize:8},
 
-    // ── 부산광역시 ──
+    // ── 부산광역시 (최남단 동해안) ──
     {id:'busan', name:'부산',
-     path:`M 318 330 L 345 322 L 360 336 L 356 356 L 334 362 L 314 350 Z`,
-     labelX:337, labelY:343, fontSize:8},
+     path:`M 362 388 L 392 378 L 412 394 L 410 418 L 386 428 L 360 416 Z`,
+     labelX:388, labelY:404, fontSize:8},
 
-    // ── 전라남도 (남서부, 해안) ──
+    // ── 전라남도 (남서부, 다도해 복잡 해안) ──
     {id:'jeonnam', name:'전남',
-     path:`M 108 292 L 140 286 L 170 290 L 195 305 L 210 328 L 210 355
-           L 195 375 L 168 385 L 138 382 L 110 365 L 92 342 L 88 315 Z`,
-     labelX:150, labelY:338, fontSize:10},
+     path:`M 72 370 L 106 360 L 140 364 L 170 378 L 194 400 L 202 428
+           L 194 456 L 170 474 L 138 480 L 104 468 L 74 444 L 56 414
+           L 58 390 Z`,
+     labelX:132, labelY:422, fontSize:10},
 
     // ── 광주광역시 (전남 내부) ──
     {id:'gwangju', name:'광주',
-     path:`M 154 308 L 178 304 L 190 318 L 184 334 L 162 338 L 148 324 Z`,
-     labelX:170, labelY:321, fontSize:8},
+     path:`M 148 370 L 174 364 L 188 380 L 184 400 L 162 408 L 142 394
+           L 138 376 Z`,
+     labelX:166, labelY:388, fontSize:8},
 
-    // ── 제주특별자치도 ──
+    // ── 제주특별자치도 (본토 남쪽 섬) ──
     {id:'jeju', name:'제주',
-     path:`M 96 530 L 140 518 L 185 516 L 220 524 L 234 542 L 224 562
-           L 195 574 L 155 578 L 112 568 L 90 550 Z`,
-     labelX:162, labelY:548, fontSize:10},
+     path:`M 74 524 L 116 510 L 164 506 L 206 510 L 234 524 L 240 544
+           L 228 562 L 196 574 L 156 578 L 114 568 L 82 550 Z`,
+     labelX:162, labelY:544, fontSize:10},
   ];
 
   // 툴팁 생성 함수
@@ -3021,7 +3035,7 @@ function buildKoreaMapPaths(valueMap, maxVal, tab){
 
   // 범례 색상 스케일 바 (우하단)
   const legendSvg = `
-    <g transform="translate(30, 630)">
+    <g transform="translate(20, 580)">
       <text x="0" y="0" font-size="9" fill="#6b8fa8" font-family="sans-serif">낮음</text>
       <defs>
         <linearGradient id="legendGrad" x1="0" x2="1" y1="0" y2="0">
