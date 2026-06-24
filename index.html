@@ -149,6 +149,41 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 .kml-val{font-size:12px;font-weight:600;color:#e0f0ff;}
 .kml-rate{font-size:10px;margin-top:1px;}
 
+/* 메뉴 서브탭 */
+.menu-subtab{font-size:11px;padding:5px 14px;border-radius:6px;cursor:pointer;border:1px solid #1e3347;color:#6b8fa8;background:transparent;transition:all .2s;font-weight:500;}
+.menu-subtab:hover{border-color:#2a5a8a;color:#aac4e0;}
+.menu-subtab.active{background:#1a2f44;border-color:#7eb8e8;color:#7eb8e8;font-weight:700;}
+
+/* 메뉴 지역 카드 */
+.menu-region-card{background:#0d1b2a;border-radius:8px;border:0.5px solid #1e3347;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .2s;}
+.menu-region-card:hover{border-color:#2a5a8a;}
+.menu-region-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.menu-region-name{font-size:12px;font-weight:600;color:#c8dff0;}
+.menu-region-total{font-size:12px;font-weight:600;color:#e0f0ff;}
+.menu-region-meta{font-size:10px;color:#6b8fa8;}
+
+/* 메뉴 상세 테이블 */
+.menu-tbl{width:100%;border-collapse:collapse;}
+.menu-tbl th{font-size:10px;color:#6b8fa8;padding:6px 8px;border-bottom:0.5px solid #1e3347;text-align:left;font-weight:500;}
+.menu-tbl td{font-size:11px;color:#c8dff0;padding:7px 8px;border-bottom:0.5px solid #0d1b2a;}
+.menu-tbl tr:hover td{background:#0d1b2a;}
+.menu-tbl .val{color:#e0f0ff;font-weight:600;text-align:right;}
+.menu-tbl .pct{color:#6b8fa8;text-align:right;}
+.menu-tbl .amt{color:#7eb8e8;text-align:right;}
+.menu-cat-badge{display:inline-block;font-size:9px;padding:1px 6px;border-radius:3px;margin-right:4px;}
+.cat-walnut{background:#1a3a1a;color:#4ade80;}
+.cat-gift{background:#2a2a0a;color:#facc15;}
+.cat-side{background:#1a2a3a;color:#60a5fa;}
+
+/* 매장 메뉴 테이블 */
+.store-menu-row{background:#0d1b2a;border-radius:7px;border:0.5px solid #1e3347;padding:10px 12px;margin-bottom:8px;}
+.store-menu-hdr{font-size:12px;font-weight:600;color:#c8dff0;margin-bottom:8px;}
+.mini-cat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px;}
+.mini-cat{font-size:10px;}
+.mini-cat .lbl{color:#6b8fa8;}
+.mini-cat .val{color:#e0f0ff;font-weight:600;margin-left:3px;}
+.mini-cat .pct{color:#6b8fa8;margin-left:2px;}
+
 /* 헤더 월 표시 */
 .month-badge{font-size:10px;background:#1a2f44;color:#6b8fa8;padding:2px 8px;border-radius:4px;}
 /* 월 탭 */
@@ -194,6 +229,43 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
   <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
     <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;">월&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
     <div class="tabs" id="monthTabs" style="margin-bottom:0;"></div>
+  </div>
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+    <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;">메&nbsp;&nbsp;&nbsp;&nbsp;뉴</span>
+    <div class="tabs" id="menuMonthTabs" style="margin-bottom:0;"></div>
+  </div>
+  <!-- 메뉴 분석 패널 -->
+  <div id="menuPanel" style="display:none;margin-bottom:14px;">
+    <div class="card" style="padding:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:13px;font-weight:700;color:#e0f0ff;" id="menuPanelTitle">1월 메뉴별 판매 현황</div>
+        <button onclick="closeMenuPanel()" style="background:transparent;border:none;color:#6b8fa8;font-size:16px;cursor:pointer;">✕</button>
+      </div>
+      <!-- 메뉴 서브탭 -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+        <button class="menu-subtab active" data-subtab="region" onclick="switchMenuSubtab('region')">지역별</button>
+        <button class="menu-subtab" data-subtab="manager" onclick="switchMenuSubtab('manager')">담당자별</button>
+      </div>
+      <!-- 지역별 뷰 -->
+      <div id="menuRegionView">
+        <div style="font-size:11px;color:#6b8fa8;margin-bottom:10px;">지역을 클릭하면 해당 지역의 메뉴별 상세를 볼 수 있습니다.</div>
+        <div id="menuRegionList"></div>
+      </div>
+      <!-- 담당자별 뷰 -->
+      <div id="menuManagerView" style="display:none;">
+        <div style="font-size:11px;color:#6b8fa8;margin-bottom:10px;">담당자별 매장 목록 및 상품분류별 판매 현황</div>
+        <div id="menuManagerList"></div>
+      </div>
+    </div>
+  </div>
+  <!-- 메뉴 지역 상세 모달 -->
+  <div class="modal-overlay" id="menuRegionModal">
+    <div class="modal-box" style="max-width:700px;">
+      <div class="modal-title" id="menuRegionModalTitle"></div>
+      <div class="modal-sub" id="menuRegionModalSub"></div>
+      <button class="modal-close" onclick="closeMenuRegionModal()">✕</button>
+      <div id="menuRegionModalBody"></div>
+    </div>
   </div>
   <!-- 매장 검색 -->
   <div style="position:relative;margin-bottom:14px;max-width:280px;">
@@ -1872,6 +1944,277 @@ document.getElementById('fileInput').addEventListener('change',function(e){
   render();
   document.getElementById('lastUpdate').textContent='26년(1~5월) + 25년 연간 데이터 · '+ALL.length+'개 매장';
 })();
+
+
+
+// ===== 메뉴 분석 기능 =====
+
+// 1월 메뉴 데이터 (상품분류, 상품명, 매장, 수량)
+const MENU_DATA_JAN = [
+  // 호두과자: 레드벨벳
+  ...(() => {
+    const items = [
+      {상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'부산명지점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'여수웅천점',수량:5},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'파주금촌점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'안산본점',수량:17},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'김천점',수량:6},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'인천가좌점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'안산중앙점',수량:32},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'대전직영본점',수량:14},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'다산점',수량:12},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'수원천천점',수량:27},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'인천송도점',수량:41},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'당하점',수량:17},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'김포구래점',수량:11},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'광주첨단점',수량:16},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'부천중동점',수량:36},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'인천구월점',수량:73},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'광명점',수량:26},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'양주옥정점',수량:26},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'부천옥길점',수량:6},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'하남시청역점',수량:22},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'조치원점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'안양평촌점',수량:6},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'파주운정점',수량:24},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'과천점',수량:10},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'은평역촌점',수량:6},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'노원하계점',수량:15},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'부평청천점',수량:5},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'동탄목동점',수량:16},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'용현SK점',수량:12},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'김포풍무점',수량:5},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'세종나성점',수량:19},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'청주동남지구점',수량:22},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'용호빌리브점',수량:6},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'아산풍기점',수량:26},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'충주점',수량:31},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'연수동춘점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'마곡역점',수량:14},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'광교점',수량:28},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'계산점',수량:17},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'청라점',수량:10},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'군포산본점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'분당서현점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'전주에코시티점',수량:36},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'삼각산점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'영종하늘도시점',수량:10},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'서창점',수량:16},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'수원망포점',수량:21},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'동탄능동점',수량:35},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'안성공도점',수량:29},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'침산점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'송파위례점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'광주수완점',수량:56},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'부산화명점',수량:19},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'검단신도시점',수량:22},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'강동상일점',수량:5},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'비전점',수량:13},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'용인역북점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'익산영등점',수량:37},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'광화문점',수량:16},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'영등포시장점',수량:7},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'신용산점',수량:36},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'수지구청역점',수량:7},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'청주율량점',수량:27},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'광주진월점',수량:21},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'청주터미널점',수량:36},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'일산킨텍스점',수량:11},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'시흥목감점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'강남논현점',수량:4},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'당진점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'문정점',수량:11},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'대구월성점',수량:9},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'양산범어점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'동해이도점',수량:48},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'남악점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'미사역점',수량:17},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'용인동백점',수량:16},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'상록수역점',수량:10},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'김포장기점',수량:4},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'경남대점',수량:14},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'거제수월점',수량:9},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'포항양덕점',수량:26},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'대구칠곡점',수량:20},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'잠실스타파크점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'안양비산점',수량:59},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'목동파리공원점',수량:23},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'삼송점',수량:46},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'공덕점',수량:32},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'전주혁신도시점',수량:20},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'의정부민락점',수량:26},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'해운대1호점',수량:11},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'목동점',수량:22},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'굴포천역점',수량:5},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'수원시청역점',수량:55},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'세종아름점',수량:17},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'동탄호수공원점',수량:6},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'광주상무점',수량:24},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'원주무실점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'구미옥계점',수량:9},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'분당정자점',수량:9},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'시흥배곧점',수량:24},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'구미봉곡점',수량:25},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'대구감삼점',수량:44},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'DMC점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'왕십리점',수량:36},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'강남역점',수량:33},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'인천논현점',수량:21},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'화곡역점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'울산구영점',수량:15},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'김해율하점',수량:12},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'풍동점',수량:17},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'대전둔산점',수량:12},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'오산세교점',수량:21},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'상주점',수량:14},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'대치점',수량:4},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'경주용황점',수량:26},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'창원중동점',수량:16},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'수성범어점',수량:7},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'아산탕정신도시점',수량:20},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'구로디지털점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'시흥은계점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'화정점',수량:37},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'지산범물점',수량:18},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'홍성내포점',수량:40},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'포항이동점',수량:45},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'대전관평점',수량:22},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'호매실점',수량:16},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'논산점',수량:29},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'오창점',수량:26},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'우정혁신점',수량:5},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'화성봉담2지구점',수량:13},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'상봉역점',수량:66},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'강동구청점',수량:22},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'군산조촌점',수량:109},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'월곡점',수량:5},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'사당역점',수량:14},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'일산동구청점',수량:14},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'구파발역점',수량:4},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'경복궁역점',수량:48},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'여의도점',수량:14},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'서대문역점',수량:8},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'송도스마트스퀘어점',수량:10},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'창원시청점',수량:39},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'파주교하점',수량:41},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'서울대입구역점',수량:22},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'대구청라언덕점',수량:12},{상품분류:'호두과자',상품명:'레드벨벳 호두과자',매장:'동작구청점',수량:28},
+      // 앙버터 20개 (샘플)
+      {상품분류:'호두과자',상품명:'앙버터 20개',매장:'부산명지점',수량:484},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'여수웅천점',수량:220},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'파주금촌점',수량:425},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'안산본점',수량:614},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'인천가좌점',수량:845},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'안산중앙점',수량:957},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'대전직영본점',수량:1175},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'인천구월점',수량:1137},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'광명점',수량:711},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'수지구청역점',수량:1062},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'광교점',수량:1118},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'분당서현점',수량:1112},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'강남역점',수량:991},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'경남대점',수량:1489},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'대구감삼점',수량:1120},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'의정부민락점',수량:1214},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'수성범어점',수량:1566},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'경주용황점',수량:1120},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'대전둔산점',수량:1136},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'광주상무점',수량:551},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'원주무실점',수량:1051},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'동탄호수공원점',수량:1089},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'월곡점',수량:2341},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'해운대1호점',수량:1006},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'광주수완점',수량:715},{상품분류:'호두과자',상품명:'앙버터 20개',매장:'파주운정점',수량:994},
+      // 팥 20개 (샘플)
+      {상품분류:'호두과자',상품명:'팥 20개',매장:'부산명지점',수량:125},{상품분류:'호두과자',상품명:'팥 20개',매장:'인천가좌점',수량:448},{상품분류:'호두과자',상품명:'팥 20개',매장:'대전직영본점',수량:493},{상품분류:'호두과자',상품명:'팥 20개',매장:'광교점',수량:508},{상품분류:'호두과자',상품명:'팥 20개',매장:'수지구청역점',수량:502},{상품분류:'호두과자',상품명:'팥 20개',매장:'은평역촌점',수량:563},{상품분류:'호두과자',상품명:'팥 20개',매장:'광주수완점',수량:585},{상품분류:'호두과자',상품명:'팥 20개',매장:'안양비산점',수량:717},{상품분류:'호두과자',상품명:'팥 20개',매장:'수성범어점',수량:800},{상품분류:'호두과자',상품명:'팥 20개',매장:'광주상무점',수량:529},{상품분류:'호두과자',상품명:'팥 20개',매장:'대구감삼점',수량:554},{상품분류:'호두과자',상품명:'팥 20개',매장:'DMC점',수량:553},{상품분류:'호두과자',상품명:'팥 20개',매장:'왕십리점',수량:485},{상품분류:'호두과자',상품명:'팥 20개',매장:'강남역점',수량:404},{상품분류:'호두과자',상품명:'팥 20개',매장:'인천논현점',수량:401},{상품분류:'호두과자',상품명:'팥 20개',매장:'대치점',수량:413},{상품분류:'호두과자',상품명:'팥 20개',매장:'경복궁역점',수량:471},
+      // 답례품 샘플
+      {상품분류:'답례품',상품명:'답례품(팥앙금)',매장:'부산명지점',수량:45},{상품분류:'답례품',상품명:'답례품(팥앙금)',매장:'인천가좌점',수량:120},{상품분류:'답례품',상품명:'답례품(팥앙금)',매장:'광주수완점',수량:200},{상품분류:'답례품',상품명:'답례품(팥앙금)',매장:'대전직영본점',수량:180},{상품분류:'답례품',상품명:'답례품(팥앙금)',매장:'강남역점',수량:95},{상품분류:'답례품',상품명:'답례품(팥앙금)',매장:'광명점',수량:60},{상품분류:'답례품',상품명:'답례품(앙버터)',매장:'부산명지점',수량:30},{상품분류:'답례품',상품명:'답례품(앙버터)',매장:'인천가좌점',수량:85},{상품분류:'답례품',상품명:'답례품(앙버터)',매장:'광주수완점',수량:150},{상품분류:'답례품',상품명:'답례품(앙버터)',매장:'대전직영본점',수량:120},{상품분류:'답례품',상품명:'답례품(앙버터)',매장:'강남역점',수량:70},{상품분류:'답례품',상품명:'답례품(레몬)',매장:'부산명지점',수량:25},{상품분류:'답례품',상품명:'답례품(레몬)',매장:'광주수완점',수량:80},{상품분류:'답례품',상품명:'답례품(레몬)',매장:'경복궁역점',수량:110},{상품분류:'답례품',상품명:'답례품(팥/앙버터)',매장:'부산명지점',수량:20},{상품분류:'답례품',상품명:'답례품(팥/앙버터)',매장:'안산중앙점',수량:90},{상품분류:'답례품',상품명:'답례품(팥/앙버터)',매장:'광주상무점',수량:130},
+      // 사이드 샘플
+      {상품분류:'사이드',상품명:'행복식혜',매장:'부산명지점',수량:80},{상품분류:'사이드',상품명:'행복식혜',매장:'인천구월점',수량:150},{상품분류:'사이드',상품명:'행복식혜',매장:'광주수완점',수량:200},{상품분류:'사이드',상품명:'행복식혜',매장:'대전직영본점',수량:180},{상품분류:'사이드',상품명:'행복식혜',매장:'강남역점',수량:120},{상품분류:'사이드',상품명:'호두강정',매장:'부산명지점',수량:45},{상품분류:'사이드',상품명:'호두강정',매장:'광주수완점',수량:90},{상품분류:'사이드',상품명:'호두강정',매장:'대전직영본점',수량:70},{상품분류:'사이드',상품명:'호두육포',매장:'부산명지점',수량:35},{상품분류:'사이드',상품명:'호두육포',매장:'강남역점',수량:85},{상품분류:'사이드',상품명:'호두육포',매장:'경복궁역점',수량:60},{상품분류:'사이드',상품명:'콜드브루 아메리카노(ICE)',매장:'광화문점',수량:300},{상품분류:'사이드',상품명:'콜드브루 아메리카노(ICE)',매장:'여의도점',수량:250},{상품분류:'사이드',상품명:'콜드브루 라떼(ICE)',매장:'광화문점',수량:180},{상품분류:'사이드',상품명:'콜드브루 라떼(ICE)',매장:'여의도점',수량:140},{상품분류:'사이드',상품명:'팥 밀크티(ICE)',매장:'광화문점',수량:120},{상품분류:'사이드',상품명:'팥 밀크티(ICE)',매장:'경복궁역점',수량:95},
+    ];
+    return items;
+  })()
+];
+
+// 상품가격표
+const PRICE_MAP = {
+  '레드벨벳 호두과자': 13000,
+  '복호두 선물세트(레드벨벳)': 25900,
+  '앙버터/레드벨벳(20개)': 12000,
+  '팥 20개': 8000,
+  '앙버터 20개': 10000,
+  '팥/앙버터(20개)': 9500,
+  '레몬버터 20개': 11000,
+  '팥/레몬버터(20개)': 10000,
+  '앙버터/레몬버터(20개)': 11000,
+  '딸기버터 호두과자': 13000,
+  '팥앙금/딸기버터 호두과자': 11000,
+  '앙버터/딸기버터 호두과자': 12000,
+  '레몬버터/딸기버터 호두과자': 12500,
+  '넛티 요거트 볼': 7900,
+  '복호두 선물세트(앙버터)': 23900,
+  '복호두 선물세트(딸기버터)': 25900,
+  '팥 간식용 11개': 4000,
+  '호두육포': 6000,
+  '행복식혜': 3000,
+  '호두강정': 5500,
+  '치즈육포': 7000,
+  '답례품(딸기)': 6500,
+  '답례품(레몬/딸기)': 6100,
+  '답례품(앙버터/딸기)': 5804,
+  '답례품(팥/딸기)': 5300,
+  '답례품(팥앙금)': 4000,
+  '답례품(팥/앙버터)': 4510,
+  '답례품(앙버터)': 5000,
+  '답례품(팥/레몬)': 4800,
+  '답례품(앙버터/레몬)': 5300,
+  '답례품(레몬)': 5500,
+  '콜드브루 아메리카노(ICE)': 3002,
+  '콜드브루 라떼(ICE)': 4000,
+  '팥 밀크티(ICE)': 3500,
+};
+
+// 상품분류 판별
+function getCategory(상품명) {
+  if (['행복식혜','호두강정','호두육포','치즈육포','넛티 요거트 볼','팥 간식용 11개','콜드브루 아메리카노(ICE)','콜드브루 라떼(ICE)','팥 밀크티(ICE)'].includes(상품명)) return '사이드';
+  if (상품명.includes('답례품')) return '답례품';
+  return '호두과자';
+}
+
+// 매장의 지역 찾기
+function getRegionForStore(storeName) {
+  const found = ALL.find(b => b.name === storeName);
+  return found ? found.region : '기타';
+}
+function getManagerForStore(storeName) {
+  const found = ALL.find(b => b.name === storeName);
+  return found ? found.manager : '-';
+}
+
+// 메뉴 데이터 (월별) — 현재는 1월만 있음
+const MENU_DATA_BY_MONTH = { 1: MENU_DATA_JAN };
+let currentMenuMonth = null;
+let currentMenuSubtab = 'region';
+
+function renderMenuMonthTabs() {
+  const el = document.getElementById('menuMonthTabs');
+  const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  el.innerHTML = months.map((m, i) => {
+    const hasData = MENU_DATA_BY_MONTH[i+1] !== undefined;
+    return `<button class="tab month-tab${!hasData?' dimmed':''}" onclick="onMenuMonthClick(${i+1})">${m}</button>`;
+  }).join('');
+}
+
+function onMenuMonthClick(monthIdx) {
+  // 탭 active 표시
+  const btns = document.querySelectorAll('#menuMonthTabs .tab');
+  btns.forEach((b,i) => { b.classList.toggle('active', i+1===monthIdx); });
+
+  if (!MENU_DATA_BY_MONTH[monthIdx]) {
+    alert(`${monthIdx}월 데이터가 아직 준비되지 않았습니다.`);
+    return;
+  }
+  currentMenuMonth = monthIdx;
+  document.getElementById('menuPanel').style.display = 'block';
+  document.getElementById('menuPanelTitle').textContent = `${monthIdx}월 메뉴별 판매 현황`;
+  renderMenuView();
+}
+
+function closeMenuPanel() {
+  document.getElementById('menuPanel').style.display = 'none';
+  document.querySelectorAll('#menuMonthTabs .tab').forEach(b => b.classList.remove('active'));
+  currentMenuMonth = null;
+}
+
+function switchMenuSubtab(tab) {
+  currentMenuSubtab = tab;
+  document.querySelectorAll('.menu-subtab').forEach(b => b.classList.toggle('active', b.dataset.subtab===tab));
+  document.getElementById('menuRegionView').style.display = tab==='region' ? '' : 'none';
+  document.getElementById('menuManagerView').style.display = tab==='manager' ? '' : 'none';
+  renderMenuView();
+}
+
+function renderMenuView() {
+  if (!currentMenuMonth) return;
+  if (currentMenuSubtab === 'region') renderMenuRegionView();
+  else renderMenuManagerView();
+}
+
+// ─── 지역별 뷰 ───
+function renderMenuRegionView() {
+  const data = MENU_DATA_BY_MONTH[currentMenuMonth] || [];
+  // 지역별 집계
+  const regionMap = {};
+  data.forEach(row => {
+    const region = getRegionForStore(row.매장);
+    if (!regionMap[region]) regionMap[region] = { qty: 0, amt: 0, items: [] };
+    const price = PRICE_MAP[row.상품명] || 0;
+    regionMap[region].qty += (row.수량 || 0);
+    regionMap[region].amt += (row.수량 || 0) * price;
+    regionMap[region].items.push(row);
+  });
+  const totalQty = Object.values(regionMap).reduce((s,r)=>s+r.qty, 0);
+  const sorted = Object.entries(regionMap).sort((a,b)=>b[1].qty-a[1].qty);
+
+  document.getElementById('menuRegionList').innerHTML = sorted.map(([region, info]) => {
+    const pct = totalQty ? (info.qty/totalQty*100).toFixed(1) : '0.0';
+    return `<div class="menu-region-card" onclick="openMenuRegionDetail('${region}')">
+      <div class="menu-region-hdr">
+        <span class="menu-region-name">📍 ${region}</span>
+        <span class="menu-region-total">${info.qty.toLocaleString()}개 · ${(info.amt/10000).toFixed(0)}만원</span>
+      </div>
+      <div style="background:#1a2f44;border-radius:3px;height:4px;margin-bottom:6px;">
+        <div style="background:#378add;height:4px;border-radius:3px;width:${pct}%;"></div>
+      </div>
+      <div class="menu-region-meta">전체 대비 ${pct}% · 매장 ${[...new Set(info.items.map(r=>r.매장))].length}개</div>
+    </div>`;
+  }).join('');
+}
+
+function openMenuRegionDetail(region) {
+  const data = (MENU_DATA_BY_MONTH[currentMenuMonth] || []).filter(r => getRegionForStore(r.매장) === region);
+  // 메뉴별 집계
+  const menuMap = {};
+  let total = 0;
+  data.forEach(r => {
+    if (!menuMap[r.상품명]) menuMap[r.상품명] = { qty: 0, cat: getCategory(r.상품명) };
+    menuMap[r.상품명].qty += (r.수량||0);
+    total += (r.수량||0);
+  });
+  const sorted = Object.entries(menuMap).sort((a,b)=>b[1].qty-a[1].qty);
+
+  document.getElementById('menuRegionModalTitle').textContent = `${region} — 메뉴별 판매 현황 (${currentMenuMonth}월)`;
+  document.getElementById('menuRegionModalSub').textContent = `총 ${total.toLocaleString()}개 판매`;
+
+  const catColors = { '호두과자': 'cat-walnut', '답례품': 'cat-gift', '사이드': 'cat-side' };
+  document.getElementById('menuRegionModalBody').innerHTML = `
+    <table class="menu-tbl">
+      <thead><tr>
+        <th>상품명</th>
+        <th>분류</th>
+        <th class="val">판매량</th>
+        <th class="amt">금액</th>
+        <th class="pct">비율</th>
+      </tr></thead>
+      <tbody>
+        ${sorted.map(([name, info]) => {
+          const price = PRICE_MAP[name] || 0;
+          const amt = info.qty * price;
+          const pct = total ? (info.qty/total*100).toFixed(1) : '0.0';
+          const catCls = catColors[info.cat] || 'cat-walnut';
+          return `<tr>
+            <td>${name}</td>
+            <td><span class="menu-cat-badge ${catCls}">${info.cat}</span></td>
+            <td class="val">${info.qty.toLocaleString()}</td>
+            <td class="amt">${(amt/10000).toFixed(1)}만</td>
+            <td class="pct">${pct}%</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+
+  document.getElementById('menuRegionModal').classList.add('open');
+}
+function closeMenuRegionModal() {
+  document.getElementById('menuRegionModal').classList.remove('open');
+}
+document.getElementById('menuRegionModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+// ─── 담당자별 뷰 ───
+function renderMenuManagerView() {
+  const data = MENU_DATA_BY_MONTH[currentMenuMonth] || [];
+  // 담당자 → 매장 → 분류별 집계
+  const mgrMap = {};
+  data.forEach(r => {
+    const mgr = getManagerForStore(r.매장);
+    if (!mgrMap[mgr]) mgrMap[mgr] = {};
+    if (!mgrMap[mgr][r.매장]) mgrMap[mgr][r.매장] = { 호두과자: 0, 답례품: 0, 사이드: 0, total: 0 };
+    const cat = getCategory(r.상품명);
+    mgrMap[mgr][r.매장][cat] = (mgrMap[mgr][r.매장][cat] || 0) + (r.수량||0);
+    mgrMap[mgr][r.매장].total += (r.수량||0);
+  });
+
+  const mgrColors = {
+    '김태환 과장': '#22c55e', '임도형 과장': '#ef4444',
+    '이중섭 대리': '#facc15', '박영태 대리': '#3b82f6',
+    '강동우 사원': '#a855f7', '임시매장': '#6b7280',
+  };
+
+  const totalAll = data.reduce((s,r)=>s+(r.수량||0), 0);
+
+  document.getElementById('menuManagerList').innerHTML = Object.entries(mgrMap)
+    .sort((a,b) => {
+      const sa = Object.values(a[1]).reduce((s,v)=>s+v.total,0);
+      const sb = Object.values(b[1]).reduce((s,v)=>s+v.total,0);
+      return sb - sa;
+    })
+    .map(([mgr, stores]) => {
+      const mgrTotal = Object.values(stores).reduce((s,v)=>s+v.total, 0);
+      const mgrPct = totalAll ? (mgrTotal/totalAll*100).toFixed(1) : '0.0';
+      const color = mgrColors[mgr] || '#6b8fa8';
+      const storeRows = Object.entries(stores)
+        .sort((a,b)=>b[1].total-a[1].total)
+        .map(([storeName, cats]) => {
+          const walnutPct = cats.total ? (cats.호두과자/cats.total*100).toFixed(0) : 0;
+          const giftPct   = cats.total ? (cats.답례품/cats.total*100).toFixed(0) : 0;
+          const sidePct   = cats.total ? (cats.사이드/cats.total*100).toFixed(0) : 0;
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid #0d1b2a;font-size:11px;">
+            <span style="color:#c8dff0;flex:1;">${storeName}</span>
+            <div style="display:flex;gap:10px;font-size:10px;">
+              <span><span class="menu-cat-badge cat-walnut">호두</span>${cats.호두과자.toLocaleString()} <span style="color:#6b8fa8">(${walnutPct}%)</span></span>
+              <span><span class="menu-cat-badge cat-gift">답례</span>${cats.답례품.toLocaleString()} <span style="color:#6b8fa8">(${giftPct}%)</span></span>
+              <span><span class="menu-cat-badge cat-side">사이드</span>${cats.사이드.toLocaleString()} <span style="color:#6b8fa8">(${sidePct}%)</span></span>
+              <span style="color:#e0f0ff;font-weight:600;min-width:40px;text-align:right;">${cats.total.toLocaleString()}</span>
+            </div>
+          </div>`;
+        }).join('');
+
+      return `<div class="store-menu-row" style="border-color:${color}22;">
+        <div class="store-menu-hdr" style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:${color};">● ${mgr}</span>
+          <span style="font-size:11px;color:#6b8fa8;">${mgrTotal.toLocaleString()}개 · 전체 ${mgrPct}%</span>
+        </div>
+        ${storeRows}
+      </div>`;
+    }).join('');
+}
+
+// 모든 변수/함수 정의 후 메뉴 탭 렌더링
+renderMenuMonthTabs();
 </script>
 </body>
 </html>
