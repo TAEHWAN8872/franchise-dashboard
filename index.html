@@ -2167,7 +2167,7 @@ function renderMenuRegionView() {
         <table class="menu-tbl">
           <thead><tr>
             <th style="min-width:60px;">지역</th>
-            <th style="min-width:130px;text-align:center;">호두과자% / 답례품% / 사이드%</th>
+            <th style="min-width:200px;">카테고리별 구성 (% · 금액)</th>
             <th style="text-align:right;min-width:55px;">매장수</th>
             <th style="text-align:right;min-width:70px;">수량</th>
             <th style="text-align:right;min-width:55px;">매출비율</th>
@@ -2183,10 +2183,12 @@ function renderMenuRegionView() {
             return `<tr style="cursor:pointer;" onclick="selectMenuRegion('${reg}')"
               onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
               <td style="font-weight:700;color:${color};">${reg}</td>
-              <td style="text-align:center;">
-                <span class="menu-cat-badge cat-walnut">${hPct}%</span>
-                <span class="menu-cat-badge cat-gift" style="margin-left:3px;">${gPct}%</span>
-                <span class="menu-cat-badge cat-side" style="margin-left:3px;">${sPct}%</span>
+              <td>
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span class="menu-cat-badge cat-walnut" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>호두과자 ${hPct}%</span><span style="opacity:0.8;">${fmtAmt(v.호두과자Amt)}</span></span>
+                  <span class="menu-cat-badge cat-gift" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>답례품 ${gPct}%</span><span style="opacity:0.8;">${fmtAmt(v.답례품Amt)}</span></span>
+                  <span class="menu-cat-badge cat-side" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>사이드 ${sPct}%</span><span style="opacity:0.8;">${fmtAmt(v.사이드Amt)}</span></span>
+                </div>
               </td>
               <td class="val">${v.stores.size}</td>
               <td class="val">${v.qty.toLocaleString()}</td>
@@ -2259,10 +2261,12 @@ function renderMenuRegionView() {
       return `<tr style="cursor:pointer;" onclick="openMenuRegionStoreModal('${storeName}', ${v.totalQty}, ${v.totalAmt}, decodeURIComponent('${menusJson}'))"
         onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
         <td style="color:#c8dff0;font-weight:600;">${storeName}</td>
-        <td style="text-align:center;">
-          <span class="menu-cat-badge cat-walnut">${hPct}%</span>
-          <span class="menu-cat-badge cat-gift" style="margin-left:3px;">${gPct}%</span>
-          <span class="menu-cat-badge cat-side" style="margin-left:3px;">${sPct}%</span>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <span class="menu-cat-badge cat-walnut" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>호두과자 ${hPct}%</span><span style="opacity:0.8;">${fmtAmt(v.호두과자Amt)}</span></span>
+            <span class="menu-cat-badge cat-gift" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>답례품 ${gPct}%</span><span style="opacity:0.8;">${fmtAmt(v.답례품Amt)}</span></span>
+            <span class="menu-cat-badge cat-side" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>사이드 ${sPct}%</span><span style="opacity:0.8;">${fmtAmt(v.사이드Amt)}</span></span>
+          </div>
         </td>
         <td class="val">${v.totalQty.toLocaleString()}</td>
         <td class="pct">${regTotalAmt ? (v.totalAmt/regTotalAmt*100).toFixed(1) : 0}%</td>
@@ -2307,7 +2311,7 @@ function renderMenuRegionView() {
       <table class="menu-tbl">
         <thead><tr>
           <th style="min-width:130px;">매장명</th>
-          <th style="min-width:130px;text-align:center;">호두과자% / 답례품% / 사이드%</th>
+          <th style="min-width:200px;">카테고리별 구성 (% · 금액)</th>
           <th style="text-align:right;min-width:70px;">수량</th>
           <th style="text-align:right;min-width:55px;">매출비율</th>
           <th style="text-align:right;min-width:90px;">총 금액</th>
@@ -2503,10 +2507,12 @@ function renderMenuManagerView() {
       return `<tr style="cursor:pointer;" onclick="openMenuStoreModal('${storeName}', ${v.totalQty}, ${v.totalAmt}, decodeURIComponent('${menusJson}'))"
         onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
         <td style="color:#c8dff0;font-weight:600;">${storeName}</td>
-        <td style="text-align:center;">
-          <span class="menu-cat-badge cat-walnut">${hPct}%</span>
-          <span class="menu-cat-badge cat-gift" style="margin-left:3px;">${gPct}%</span>
-          <span class="menu-cat-badge cat-side" style="margin-left:3px;">${sPct}%</span>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <span class="menu-cat-badge cat-walnut" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>호두과자 ${hPct}%</span><span style="opacity:0.8;">${fmtAmt(v.호두과자Amt)}</span></span>
+            <span class="menu-cat-badge cat-gift" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>답례품 ${gPct}%</span><span style="opacity:0.8;">${fmtAmt(v.답례품Amt)}</span></span>
+            <span class="menu-cat-badge cat-side" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>사이드 ${sPct}%</span><span style="opacity:0.8;">${fmtAmt(v.사이드Amt)}</span></span>
+          </div>
         </td>
         <td class="val">${v.totalQty.toLocaleString()}</td>
         <td class="pct">${mgrTotalAmt ? (v.totalAmt/mgrTotalAmt*100).toFixed(1) : 0}%</td>
@@ -2534,7 +2540,7 @@ function renderMenuManagerView() {
       <table class="menu-tbl">
         <thead><tr>
           <th style="min-width:130px;">매장명</th>
-          <th style="min-width:130px;text-align:center;">호두과자% / 답례품% / 사이드%</th>
+          <th style="min-width:200px;">카테고리별 구성 (% · 금액)</th>
           <th style="text-align:right;min-width:70px;">수량</th>
           <th style="text-align:right;min-width:55px;">매출비율</th>
           <th style="text-align:right;min-width:90px;">총 금액</th>
