@@ -232,7 +232,21 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       <div class="branch-scroll" id="branchList" style="max-height:420px;"></div>
     </div>
     <div class="card">
-      <div class="ctitle">월별 합산 매출 추이 (25년 vs 26년)</div>
+      <div class="ctitle" style="flex-direction:column;align-items:flex-start;gap:8px;">
+        <span>월별 합산 매출 추이 (25년 vs 26년)</span>
+        <div style="display:flex;gap:5px;">
+          <div id="trendTabAvg" onclick="setTrendTab('avg')"
+            style="font-size:10px;padding:3px 10px;border-radius:5px;cursor:pointer;border:0.5px solid #2a5a8a;
+            color:#38bdf8;background:rgba(56,189,248,0.18);transition:all .15s;font-weight:600;">
+            📊 평균매출
+          </div>
+          <div id="trendTabLog" onclick="setTrendTab('log')"
+            style="font-size:10px;padding:3px 10px;border-radius:5px;cursor:pointer;border:0.5px solid #3a2a5a;
+            color:#a78bfa;background:transparent;transition:all .15s;">
+            🚚 물류매출
+          </div>
+        </div>
+      </div>
       <div class="cw"><canvas id="trendChart" role="img" aria-label="월별 합산 매출 추이"></canvas></div>
       <div id="trendSummary" style="margin-top:10px;overflow-x:auto;"></div>
     </div>
@@ -368,6 +382,7 @@ let currentRegion = 'all';
 let currentSearch = '';
 let selectedMonthIdx = -1; // -1 = 최신월 자동
 let charts = {};
+let currentTrendTab = 'avg'; // 'avg' | 'log'
 
 function fmt(n){
   const m = Math.round(n/10000);
@@ -603,6 +618,20 @@ function destroyChart(key){
   if(charts[key]){ charts[key].destroy(); delete charts[key]; }
 }
 
+function setTrendTab(tab){
+  currentTrendTab = tab;
+  // 탭 스타일 업데이트
+  document.getElementById('trendTabAvg').style.color = tab==='avg' ? '#38bdf8' : '#6b8fa8';
+  document.getElementById('trendTabAvg').style.background = tab==='avg' ? 'rgba(56,189,248,0.18)' : 'transparent';
+  document.getElementById('trendTabAvg').style.borderColor = tab==='avg' ? '#2a5a8a' : '#1e3347';
+  document.getElementById('trendTabAvg').style.fontWeight = tab==='avg' ? '600' : '400';
+  document.getElementById('trendTabLog').style.color = tab==='log' ? '#a78bfa' : '#6b8fa8';
+  document.getElementById('trendTabLog').style.background = tab==='log' ? 'rgba(168,85,247,0.18)' : 'transparent';
+  document.getElementById('trendTabLog').style.borderColor = tab==='log' ? '#3a2a5a' : '#1e3347';
+  document.getElementById('trendTabLog').style.fontWeight = tab==='log' ? '600' : '400';
+  renderTrend(filtered());
+}
+
 // 월별 합산 추이 차트: 25년 vs 26년 비교 + 평균매출 라인
 function renderTrend(data){
   const fmtDetail=v=>{
@@ -625,9 +654,6 @@ function renderTrend(data){
   // 각 월별 매장 수
   const counts26=active.map(x=>data.filter(b=>(b.months[x.i]||0)>0).length);
   const counts25=active.map(x=>data.filter(b=>(get25(b.name,x.i)||0)>0).length);
-  // 각 월별 평균 매출 (만원)
-  const avg26=active.map((x,i)=>counts26[i]>0?Math.round(vals26[i]/counts26[i]):null);
-  const avg25=active.map((x,i)=>counts25[i]>0?Math.round(vals25[i]/counts25[i]):null);
 
   const allVals=[...vals26,...vals25.filter(v=>v>0)];
   const minVal=Math.min(...allVals);
@@ -635,95 +661,243 @@ function renderTrend(data){
   const pad=Math.round((maxVal-minVal)*0.15)||Math.round(minVal*0.05)||1000;
   const yMin=Math.max(0, minVal-pad);
 
-  // 평균매출 보조축 범위
-  const avgVals=[...avg26,...avg25].filter(v=>v!=null&&v>0);
-  const avgMin=avgVals.length?Math.min(...avgVals):0;
-  const avgMax=avgVals.length?Math.max(...avgVals):1;
-  const avgPad=Math.round((avgMax-avgMin)*0.2)||500;
-
   destroyChart('trend');
-  charts.trend=new Chart(document.getElementById('trendChart'),{
-    type:'bar',
-    data:{labels,datasets:[
-      // 평균 막대 (배경에 깔림, y2축) — 25년 먼저 선언 → 왼쪽, 26년 → 오른쪽
-      {type:'bar',label:'26년 평균',data:avg26,
-        backgroundColor:'rgba(56,189,248,0.55)',borderColor:'rgba(56,189,248,0.9)',
-        borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:4},
-      {type:'bar',label:'25년 평균',data:avg25,
-        backgroundColor:'rgba(255,176,50,0.55)',borderColor:'rgba(255,176,50,0.9)',
-        borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:3},
-      // 합산 꺾은선 (위에 그려짐, y축)
-      {type:'line',label:'25년 합산',data:vals25,
-        borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.08)',
-        fill:true,
-        tension:0.4,pointRadius:5,pointStyle:'triangle',pointBackgroundColor:'#f59e0b',
-        pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderWidth:2,
-        borderDash:[5,3],yAxisID:'y',order:2},
-      {type:'line',label:'26년 합산',data:vals26,
-        borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.06)',
-        fill:true,
-        tension:0.4,pointRadius:6,pointStyle:'circle',pointBackgroundColor:'#38bdf8',
-        pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderWidth:2.5,
-        yAxisID:'y',order:1},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{
-        datalabels:{display:false},
-        legend:{display:true,labels:{color:'#aac4e0',font:{size:11},boxWidth:14,
-          generateLabels:chart=>chart.data.datasets.map((ds,i)=>{
-            const isBar=ds.type==='bar';
-            return {
-              text:ds.label,
-              fillStyle:isBar?(ds.backgroundColor||ds.borderColor):ds.borderColor,
-              strokeStyle:ds.borderColor,
-              lineDash:ds.borderDash||[],
-              lineWidth:isBar?1:2.5,
-              fontColor:'#aac4e0',hidden:false,
-              datasetIndex:i
-            };
-          })
-        }},
-        tooltip:{
-          mode:'index',intersect:false,
-          callbacks:{
-            label:c=>{
-              const lbl=c.dataset.label;
-              const v=c.parsed.y;
-              if(v==null) return null;
-              const fv=fmtDetail(v);
-              if(lbl==='26년 합산'){
-                const v25=vals25[c.dataIndex]||0;
-                if(v25>0){
-                  const rate=Math.round((v-v25)/v25*1000)/10;
-                  const sign=rate>=0?'▲':'▼';
-                  const diff=v-v25;
-                  const diffSign=diff>=0?'+':'-';
-                  return `${lbl}: ${fv}  (전년비 ${sign}${Math.abs(rate)}%,  ${diffSign}${fmtDetail(Math.abs(diff))})`;
+
+  if(currentTrendTab === 'avg'){
+    // ── 탭1: 평균매출 막대 + 합산 꺾은선 ──
+    const avg26=active.map((x,i)=>counts26[i]>0?Math.round(vals26[i]/counts26[i]):null);
+    const avg25=active.map((x,i)=>counts25[i]>0?Math.round(vals25[i]/counts25[i]):null);
+    const avgVals=[...avg26,...avg25].filter(v=>v!=null&&v>0);
+    const avgMin=avgVals.length?Math.min(...avgVals):0;
+    const avgMax=avgVals.length?Math.max(...avgVals):1;
+    const avgPad=Math.round((avgMax-avgMin)*0.2)||500;
+
+    charts.trend=new Chart(document.getElementById('trendChart'),{
+      type:'bar',
+      data:{labels,datasets:[
+        {type:'bar',label:'26년 평균',data:avg26,
+          backgroundColor:'rgba(56,189,248,0.55)',borderColor:'rgba(56,189,248,0.9)',
+          borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:4},
+        {type:'bar',label:'25년 평균',data:avg25,
+          backgroundColor:'rgba(255,176,50,0.55)',borderColor:'rgba(255,176,50,0.9)',
+          borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:3},
+        {type:'line',label:'25년 합산',data:vals25,
+          borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.08)',
+          fill:true,tension:0.4,pointRadius:5,pointStyle:'triangle',pointBackgroundColor:'#f59e0b',
+          pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderWidth:2,
+          borderDash:[5,3],yAxisID:'y',order:2},
+        {type:'line',label:'26년 합산',data:vals26,
+          borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.06)',
+          fill:true,tension:0.4,pointRadius:6,pointStyle:'circle',pointBackgroundColor:'#38bdf8',
+          pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderWidth:2.5,
+          yAxisID:'y',order:1},
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{
+          datalabels:{display:false},
+          legend:{display:true,labels:{color:'#aac4e0',font:{size:11},boxWidth:14,
+            generateLabels:chart=>chart.data.datasets.map((ds,i)=>{
+              const isBar=ds.type==='bar';
+              return {
+                text:ds.label,
+                fillStyle:isBar?(ds.backgroundColor||ds.borderColor):ds.borderColor,
+                strokeStyle:ds.borderColor,
+                lineDash:ds.borderDash||[],
+                lineWidth:isBar?1:2.5,
+                fontColor:'#aac4e0',hidden:false,
+                datasetIndex:i
+              };
+            })
+          }},
+          tooltip:{
+            mode:'index',intersect:false,
+            callbacks:{
+              label:c=>{
+                const lbl=c.dataset.label;
+                const v=c.parsed.y;
+                if(v==null) return null;
+                const fv=fmtDetail(v);
+                if(lbl==='26년 합산'){
+                  const v25=vals25[c.dataIndex]||0;
+                  if(v25>0){
+                    const rate=Math.round((v-v25)/v25*1000)/10;
+                    const sign=rate>=0?'▲':'▼';
+                    const diff=v-v25;
+                    const diffSign=diff>=0?'+':'-';
+                    return `${lbl}: ${fv}  (전년비 ${sign}${Math.abs(rate)}%,  ${diffSign}${fmtDetail(Math.abs(diff))})`;
+                  }
                 }
+                return `${lbl}: ${fv}`;
               }
-              return `${lbl}: ${fv}`;
             }
           }
-        }
-      },
-      scales:{
-        x:{ticks:{color:'#6b8fa8',font:{size:11}},grid:{color:'#1a2f44'}},
-        y:{position:'left',min:yMin,
-          title:{display:true,text:'합산 매출',color:'#38bdf8',font:{size:10}},
-          ticks:{color:'#38bdf8',font:{size:11},callback:v=>{
-            if(v>=10000) return (v/10000).toFixed(1)+'억';
-            return v.toLocaleString()+'만';
-          }},grid:{color:'#1a2f44'}},
-        y2:{position:'right',min:2000,max:avgMax+avgPad,
-          title:{display:false},
-          ticks:{color:'#fbbf24',font:{size:10},callback:v=>{
-            if(v>=10000) return (v/10000).toFixed(1)+'억';
-            return v.toLocaleString()+'만';
-          }},grid:{display:false}}
-      }}
-  });
+        },
+        scales:{
+          x:{ticks:{color:'#6b8fa8',font:{size:11}},grid:{color:'#1a2f44'}},
+          y:{position:'left',min:yMin,
+            title:{display:true,text:'합산 매출',color:'#38bdf8',font:{size:10}},
+            ticks:{color:'#38bdf8',font:{size:11},callback:v=>{
+              if(v>=10000) return (v/10000).toFixed(1)+'억';
+              return v.toLocaleString()+'만';
+            }},grid:{color:'#1a2f44'}},
+          y2:{position:'right',min:2000,max:avgMax+avgPad,
+            title:{display:false},
+            ticks:{color:'#fbbf24',font:{size:10},callback:v=>{
+              if(v>=10000) return (v/10000).toFixed(1)+'억';
+              return v.toLocaleString()+'만';
+            }},grid:{display:false}}
+        }}
+    });
 
-  // 매장 수 별도 차트
+    // 합산 수치 요약 테이블 (평균 탭)
+    const rows=labels.map((lbl,i)=>{
+      const v26=vals26[i]||0, v25=vals25[i]||0;
+      const diff=v26-v25;
+      const rate=v25>0?Math.round((v26-v25)/v25*1000)/10:null;
+      const rateStr=rate!=null?(rate>=0?`<span style="color:#3db87a">▲${rate}%</span>`:`<span style="color:#e05555">▼${Math.abs(rate)}%</span>`):'<span style="color:#6b8fa8">-</span>';
+      const absDiff=fmtDetail(Math.abs(diff));
+      const diffStr=diff>0?`<span style="color:#3db87a">+${absDiff}</span>`:diff<0?`<span style="color:#e05555">-${absDiff}</span>`:'<span style="color:#6b8fa8">-</span>';
+      return `<td style="padding:5px 8px;text-align:center;font-size:10px;color:#6b8fa8;border-bottom:0.5px solid #1a2f44;">${lbl}</td>
+<td style="padding:5px 8px;text-align:right;font-size:10px;color:#38bdf8;border-bottom:0.5px solid #1a2f44;">${fmtDetail(v26)}</td>
+<td style="padding:5px 8px;text-align:right;font-size:10px;color:#f59e0b;border-bottom:0.5px solid #1a2f44;">${v25>0?fmtDetail(v25):'-'}</td>
+<td style="padding:5px 8px;text-align:center;font-size:10px;border-bottom:0.5px solid #1a2f44;">${rateStr}</td>
+<td style="padding:5px 8px;text-align:right;font-size:10px;border-bottom:0.5px solid #1a2f44;">${diffStr}</td>`;
+    });
+    document.getElementById('trendSummary').innerHTML=`
+<table style="width:100%;border-collapse:collapse;min-width:320px;">
+  <thead>
+    <tr style="background:#0d1b2a;">
+      <th style="padding:5px 8px;text-align:center;font-size:10px;color:#6b8fa8;font-weight:500;">월</th>
+      <th style="padding:5px 8px;text-align:right;font-size:10px;color:#38bdf8;font-weight:500;">26년</th>
+      <th style="padding:5px 8px;text-align:right;font-size:10px;color:#f59e0b;font-weight:500;">25년</th>
+      <th style="padding:5px 8px;text-align:center;font-size:10px;color:#aac4e0;font-weight:500;">전년비</th>
+      <th style="padding:5px 8px;text-align:right;font-size:10px;color:#aac4e0;font-weight:500;">증감액</th>
+    </tr>
+  </thead>
+  <tbody>${rows.map(r=>`<tr>${r}</tr>`).join('')}</tbody>
+</table>`;
+
+  } else {
+    // ── 탭2: 물류 월별 합산 막대 + 합산 꺾은선 ──
+    const LOGISTICS = window.LOGISTICS || {};
+    const logsums=active.map(x=>data.reduce((s,b)=>{
+      const logArr=LOGISTICS[b.name]; return s+(logArr?logArr[x.i]||0:0);
+    },0)).map(v=>Math.round(v/10000));
+
+    const logMax=Math.max(...logsums.filter(v=>v>0),1);
+    const logPad=Math.round(logMax*0.2)||500;
+
+    charts.trend=new Chart(document.getElementById('trendChart'),{
+      type:'bar',
+      data:{labels,datasets:[
+        // 물류 합산 막대 (우축)
+        {type:'bar',label:'물류 합산',data:logsums,
+          backgroundColor:'rgba(168,85,247,0.5)',borderColor:'rgba(168,85,247,0.9)',
+          borderWidth:1.5,borderRadius:5,yAxisID:'y2',order:3},
+        // 합산 꺾은선 (좌축)
+        {type:'line',label:'25년 합산',data:vals25,
+          borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.08)',
+          fill:true,tension:0.4,pointRadius:5,pointStyle:'triangle',pointBackgroundColor:'#f59e0b',
+          pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderWidth:2,
+          borderDash:[5,3],yAxisID:'y',order:2},
+        {type:'line',label:'26년 합산',data:vals26,
+          borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.06)',
+          fill:true,tension:0.4,pointRadius:6,pointStyle:'circle',pointBackgroundColor:'#38bdf8',
+          pointBorderColor:'#0d1b2a',pointBorderWidth:2,borderWidth:2.5,
+          yAxisID:'y',order:1},
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{
+          datalabels:{display:false},
+          legend:{display:true,labels:{color:'#aac4e0',font:{size:11},boxWidth:14,
+            generateLabels:chart=>chart.data.datasets.map((ds,i)=>{
+              const isBar=ds.type==='bar';
+              return {
+                text:ds.label,
+                fillStyle:isBar?(ds.backgroundColor||ds.borderColor):ds.borderColor,
+                strokeStyle:ds.borderColor,
+                lineDash:ds.borderDash||[],
+                lineWidth:isBar?1:2.5,
+                fontColor:'#aac4e0',hidden:false,
+                datasetIndex:i
+              };
+            })
+          }},
+          tooltip:{
+            mode:'index',intersect:false,
+            callbacks:{
+              label:c=>{
+                const lbl=c.dataset.label;
+                const v=c.parsed.y;
+                if(v==null) return null;
+                const fv=fmtDetail(v);
+                if(lbl==='26년 합산'){
+                  const v25=vals25[c.dataIndex]||0;
+                  if(v25>0){
+                    const rate=Math.round((v-v25)/v25*1000)/10;
+                    const sign=rate>=0?'▲':'▼';
+                    const diff=v-v25;
+                    const diffSign=diff>=0?'+':'-';
+                    return `${lbl}: ${fv}  (전년비 ${sign}${Math.abs(rate)}%,  ${diffSign}${fmtDetail(Math.abs(diff))})`;
+                  }
+                }
+                if(lbl==='물류 합산'){
+                  const s26=vals26[c.dataIndex]||0;
+                  const ratio=s26>0?(v/s26*100).toFixed(1):null;
+                  return [`${lbl}: ${fv}`, ratio!=null?`매출 대비: ${ratio}%`:null].filter(Boolean);
+                }
+                return `${lbl}: ${fv}`;
+              }
+            }
+          }
+        },
+        scales:{
+          x:{ticks:{color:'#6b8fa8',font:{size:11}},grid:{color:'#1a2f44'}},
+          y:{position:'left',min:yMin,
+            title:{display:true,text:'합산 매출',color:'#38bdf8',font:{size:10}},
+            ticks:{color:'#38bdf8',font:{size:11},callback:v=>{
+              if(v>=10000) return (v/10000).toFixed(1)+'억';
+              return v.toLocaleString()+'만';
+            }},grid:{color:'#1a2f44'}},
+          y2:{position:'right',min:0,max:logMax+logPad,
+            title:{display:true,text:'물류 합산',color:'#a78bfa',font:{size:10}},
+            ticks:{color:'#a78bfa',font:{size:10},callback:v=>{
+              if(v>=10000) return (v/10000).toFixed(1)+'억';
+              return v.toLocaleString()+'만';
+            }},grid:{display:false}}
+        }}
+    });
+
+    // 물류 수치 요약 테이블 (물류 탭)
+    const rows=labels.map((lbl,i)=>{
+      const v26=vals26[i]||0, v25=vals25[i]||0, vLog=logsums[i]||0;
+      const diff=v26-v25;
+      const rate=v25>0?Math.round((v26-v25)/v25*1000)/10:null;
+      const rateStr=rate!=null?(rate>=0?`<span style="color:#3db87a">▲${rate}%</span>`:`<span style="color:#e05555">▼${Math.abs(rate)}%</span>`):'<span style="color:#6b8fa8">-</span>';
+      const logRatio=v26>0&&vLog>0?(vLog/v26*100).toFixed(1):null;
+      const logColor=logRatio==null?'#6b8fa8':parseFloat(logRatio)>=35?'#e05555':parseFloat(logRatio)>=25?'#f0a04a':'#3db87a';
+      return `<td style="padding:5px 8px;text-align:center;font-size:10px;color:#6b8fa8;border-bottom:0.5px solid #1a2f44;">${lbl}</td>
+<td style="padding:5px 8px;text-align:right;font-size:10px;color:#38bdf8;border-bottom:0.5px solid #1a2f44;">${fmtDetail(v26)}</td>
+<td style="padding:5px 8px;text-align:right;font-size:10px;color:#f59e0b;border-bottom:0.5px solid #1a2f44;">${v25>0?fmtDetail(v25):'-'}</td>
+<td style="padding:5px 8px;text-align:center;font-size:10px;border-bottom:0.5px solid #1a2f44;">${rateStr}</td>
+<td style="padding:5px 8px;text-align:right;font-size:10px;color:#a78bfa;border-bottom:0.5px solid #1a2f44;">${vLog>0?fmtDetail(vLog):'-'}</td>
+<td style="padding:5px 8px;text-align:center;font-size:10px;border-bottom:0.5px solid #1a2f44;"><span style="color:${logColor}">${logRatio!=null?logRatio+'%':'-'}</span></td>`;
+    });
+    document.getElementById('trendSummary').innerHTML=`
+<table style="width:100%;border-collapse:collapse;min-width:360px;">
+  <thead>
+    <tr style="background:#0d1b2a;">
+      <th style="padding:5px 8px;text-align:center;font-size:10px;color:#6b8fa8;font-weight:500;">월</th>
+      <th style="padding:5px 8px;text-align:right;font-size:10px;color:#38bdf8;font-weight:500;">26년 합산</th>
+      <th style="padding:5px 8px;text-align:right;font-size:10px;color:#f59e0b;font-weight:500;">25년 합산</th>
+      <th style="padding:5px 8px;text-align:center;font-size:10px;color:#aac4e0;font-weight:500;">전년비</th>
+      <th style="padding:5px 8px;text-align:right;font-size:10px;color:#a78bfa;font-weight:500;">물류 합산</th>
+      <th style="padding:5px 8px;text-align:center;font-size:10px;color:#c4b5fd;font-weight:500;">물류비중</th>
+    </tr>
+  </thead>
+  <tbody>${rows.map(r=>`<tr>${r}</tr>`).join('')}</tbody>
+</table>`;
+  }
   destroyChart('store');
   charts.store=new Chart(document.getElementById('storeChart'),{
     type:'bar',
@@ -746,34 +920,6 @@ function renderTrend(data){
           grid:{color:'#1a2f44'}}
       }}
   });
-
-  // ── 월별 합산 수치 요약 카드 ──────────────────────────────
-  const rows=labels.map((lbl,i)=>{
-    const v26=vals26[i]||0, v25=vals25[i]||0;
-    const diff=v26-v25;
-    const rate=v25>0?Math.round((v26-v25)/v25*1000)/10:null;
-    const rateStr=rate!=null?(rate>=0?`<span style="color:#3db87a">▲${rate}%</span>`:`<span style="color:#e05555">▼${Math.abs(rate)}%</span>`):'<span style="color:#6b8fa8">-</span>';
-    const absDiff=fmtDetail(Math.abs(diff));
-    const diffStr=diff>0?`<span style="color:#3db87a">+${absDiff}</span>`:diff<0?`<span style="color:#e05555">-${absDiff}</span>`:'<span style="color:#6b8fa8">-</span>';
-    return `<td style="padding:5px 8px;text-align:center;font-size:10px;color:#6b8fa8;border-bottom:0.5px solid #1a2f44;">${lbl}</td>
-<td style="padding:5px 8px;text-align:right;font-size:10px;color:#38bdf8;border-bottom:0.5px solid #1a2f44;">${fmtDetail(v26)}</td>
-<td style="padding:5px 8px;text-align:right;font-size:10px;color:#f59e0b;border-bottom:0.5px solid #1a2f44;">${v25>0?fmtDetail(v25):'-'}</td>
-<td style="padding:5px 8px;text-align:center;font-size:10px;border-bottom:0.5px solid #1a2f44;">${rateStr}</td>
-<td style="padding:5px 8px;text-align:right;font-size:10px;border-bottom:0.5px solid #1a2f44;">${diffStr}</td>`;
-  });
-  document.getElementById('trendSummary').innerHTML=`
-<table style="width:100%;border-collapse:collapse;min-width:320px;">
-  <thead>
-    <tr style="background:#0d1b2a;">
-      <th style="padding:5px 8px;text-align:center;font-size:10px;color:#6b8fa8;font-weight:500;">월</th>
-      <th style="padding:5px 8px;text-align:right;font-size:10px;color:#38bdf8;font-weight:500;">26년</th>
-      <th style="padding:5px 8px;text-align:right;font-size:10px;color:#f59e0b;font-weight:500;">25년</th>
-      <th style="padding:5px 8px;text-align:center;font-size:10px;color:#aac4e0;font-weight:500;">전년비</th>
-      <th style="padding:5px 8px;text-align:right;font-size:10px;color:#aac4e0;font-weight:500;">증감액</th>
-    </tr>
-  </thead>
-  <tbody>${rows.map(r=>`<tr>${r}</tr>`).join('')}</tbody>
-</table>`;
 
   // ── 매장 수 수치 요약 ──────────────────────────────────────
   const storeCols=labels.map((lbl,i)=>{
