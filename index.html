@@ -2147,7 +2147,7 @@ function renderMenuRegionView() {
     });
     const totalQty = Object.values(regionMap).reduce((s, r) => s + r.qty, 0);
     const totalAmt = Object.values(regionMap).reduce((s, r) => s + r.amt, 0);
-    const sorted = Object.entries(regionMap).sort((a, b) => b[1].qty - a[1].qty);
+    const sorted = Object.entries(regionMap).sort((a, b) => b[1].amt - a[1].amt);
 
     document.getElementById('menuRegionList').innerHTML = `
       <div style="display:flex;gap:10px;margin-bottom:12px;">
@@ -2168,7 +2168,7 @@ function renderMenuRegionView() {
             <th style="min-width:130px;text-align:center;">호두과자% / 답례품% / 사이드%</th>
             <th style="text-align:right;min-width:55px;">매장수</th>
             <th style="text-align:right;min-width:70px;">수량</th>
-            <th style="text-align:right;min-width:55px;">비율</th>
+            <th style="text-align:right;min-width:55px;">매출비율</th>
             <th style="text-align:right;min-width:90px;">금액</th>
           </tr></thead>
           <tbody>
@@ -2232,10 +2232,10 @@ function renderMenuRegionView() {
 
   // 메뉴 랭킹 (상위 표시)
   const menuRows = Object.entries(menuMap)
-    .sort((a, b) => b[1].qty - a[1].qty)
+    .sort((a, b) => b[1].amt - a[1].amt)
     .map(([nm, v]) => {
       const catClass = v.cat==='호두과자'?'cat-walnut':v.cat==='답례품'?'cat-gift':'cat-side';
-      const pct = regTotalQty ? (v.qty/regTotalQty*100).toFixed(1) : '0.0';
+      const pct = regTotalAmt ? (v.amt/regTotalAmt*100).toFixed(1) : '0.0';
       return `<tr>
         <td style="min-width:160px;">${nm}</td>
         <td><span class="menu-cat-badge ${catClass}">${v.cat}</span></td>
@@ -2247,7 +2247,7 @@ function renderMenuRegionView() {
 
   // 매장 테이블
   const storeRows = Object.entries(storeMap)
-    .sort((a, b) => b[1].totalQty - a[1].totalQty)
+    .sort((a, b) => b[1].totalAmt - a[1].totalAmt)
     .map(([storeName, v]) => {
       const hPct = v.totalQty ? (v.호두과자/v.totalQty*100).toFixed(0) : 0;
       const gPct = v.totalQty ? (v.답례품/v.totalQty*100).toFixed(0) : 0;
@@ -2262,7 +2262,7 @@ function renderMenuRegionView() {
           <span class="menu-cat-badge cat-side" style="margin-left:3px;">${sPct}%</span>
         </td>
         <td class="val">${v.totalQty.toLocaleString()}</td>
-        <td class="pct">${regTotalQty ? (v.totalQty/regTotalQty*100).toFixed(1) : 0}%</td>
+        <td class="pct">${regTotalAmt ? (v.totalAmt/regTotalAmt*100).toFixed(1) : 0}%</td>
         <td class="amt">${fmtAmt(v.totalAmt)}</td>
       </tr>`;
     }).join('');
@@ -2291,7 +2291,7 @@ function renderMenuRegionView() {
             <th style="min-width:160px;">메뉴명</th>
             <th style="min-width:60px;">분류</th>
             <th style="text-align:right;min-width:70px;">수량</th>
-            <th style="text-align:right;min-width:55px;">비율</th>
+            <th style="text-align:right;min-width:55px;">매출비율</th>
             <th style="text-align:right;min-width:90px;">금액</th>
           </tr></thead>
           <tbody>${menuRows}</tbody>
@@ -2306,7 +2306,7 @@ function renderMenuRegionView() {
           <th style="min-width:130px;">매장명</th>
           <th style="min-width:130px;text-align:center;">호두과자% / 답례품% / 사이드%</th>
           <th style="text-align:right;min-width:70px;">수량</th>
-          <th style="text-align:right;min-width:55px;">비율</th>
+          <th style="text-align:right;min-width:55px;">매출비율</th>
           <th style="text-align:right;min-width:90px;">총 금액</th>
         </tr></thead>
         <tbody>${storeRows}</tbody>
@@ -2324,7 +2324,7 @@ function openMenuRegionStoreModal(storeName, totalQty, totalAmt, menusJsonStr) {
     `총 ${totalQty.toLocaleString()}개 · ${fmtAmt(totalAmt)}`;
 
   const rows = Object.entries(menus)
-    .sort((a, b) => b[1].qty - a[1].qty)
+    .sort((a, b) => b[1].amt - a[1].amt)
     .map(([nm, v]) => {
       const catClass = v.cat==='호두과자'?'cat-walnut':v.cat==='답례품'?'cat-gift':'cat-side';
       const pct = totalAmt ? (v.amt/totalAmt*100).toFixed(1) : '0.0';
@@ -2344,7 +2344,7 @@ function openMenuRegionStoreModal(storeName, totalQty, totalAmt, menusJsonStr) {
           <th style="min-width:160px;">메뉴명</th>
           <th style="min-width:60px;">분류</th>
           <th style="text-align:right;min-width:70px;">수량</th>
-          <th style="text-align:right;min-width:55px;">비율</th>
+          <th style="text-align:right;min-width:55px;">매출비율</th>
           <th style="text-align:right;min-width:90px;">금액</th>
         </tr></thead>
         <tbody>${rows}</tbody>
@@ -2428,9 +2428,9 @@ function renderMenuManagerView() {
     });
     const totalQty = Object.values(menuMap).reduce((s,v) => s+v.수량, 0);
     const totalAmt = Object.values(menuMap).reduce((s,v) => s+v.금액, 0);
-    const rows = Object.entries(menuMap).sort((a,b) => b[1].수량-a[1].수량).map(([nm,v]) => {
+    const rows = Object.entries(menuMap).sort((a,b) => b[1].금액-a[1].금액).map(([nm,v]) => {
       const catClass = v.분류==='호두과자'?'cat-walnut':v.분류==='답례품'?'cat-gift':'cat-side';
-      const pct = totalQty ? (v.수량/totalQty*100).toFixed(1) : '0.0';
+      const pct = totalAmt ? (v.금액/totalAmt*100).toFixed(1) : '0.0';
       return `<tr>
         <td>${nm}</td>
         <td><span class="menu-cat-badge ${catClass}">${v.분류}</span></td>
@@ -2457,7 +2457,7 @@ function renderMenuManagerView() {
             <th style="min-width:160px;">메뉴명</th>
             <th style="min-width:60px;">분류</th>
             <th style="text-align:right;min-width:70px;">수량</th>
-            <th style="text-align:right;min-width:55px;">비율</th>
+            <th style="text-align:right;min-width:55px;">매출비율</th>
             <th style="text-align:right;min-width:90px;">금액</th>
           </tr></thead>
           <tbody>${rows}</tbody>
@@ -2488,7 +2488,7 @@ function renderMenuManagerView() {
   const mgrTotalAmt = Object.values(storeMap).reduce((s,v) => s+v.totalAmt, 0);
 
   const storeRows = Object.entries(storeMap)
-    .sort((a,b) => b[1].totalQty - a[1].totalQty)
+    .sort((a,b) => b[1].totalAmt - a[1].totalAmt)
     .map(([storeName, v]) => {
       const hPct = v.totalQty ? (v.호두과자/v.totalQty*100).toFixed(0) : 0;
       const gPct = v.totalQty ? (v.답례품/v.totalQty*100).toFixed(0) : 0;
@@ -2503,7 +2503,7 @@ function renderMenuManagerView() {
           <span class="menu-cat-badge cat-side" style="margin-left:3px;">${sPct}%</span>
         </td>
         <td class="val">${v.totalQty.toLocaleString()}</td>
-        <td class="pct">${mgrTotalQty ? (v.totalQty/mgrTotalQty*100).toFixed(1) : 0}%</td>
+        <td class="pct">${mgrTotalAmt ? (v.totalAmt/mgrTotalAmt*100).toFixed(1) : 0}%</td>
         <td class="amt">${fmtAmt(v.totalAmt)}</td>
       </tr>`;
     }).join('');
@@ -2530,7 +2530,7 @@ function renderMenuManagerView() {
           <th style="min-width:130px;">매장명</th>
           <th style="min-width:130px;text-align:center;">호두과자% / 답례품% / 사이드%</th>
           <th style="text-align:right;min-width:70px;">수량</th>
-          <th style="text-align:right;min-width:55px;">비율</th>
+          <th style="text-align:right;min-width:55px;">매출비율</th>
           <th style="text-align:right;min-width:90px;">총 금액</th>
         </tr></thead>
         <tbody>${storeRows}</tbody>
@@ -2549,7 +2549,7 @@ function openMenuStoreModal(storeName, totalQty, totalAmt, menusJsonStr) {
     `총 ${totalQty.toLocaleString()}개 · ${fmtAmt(totalAmt)}`;
 
   const rows = Object.entries(menus)
-    .sort((a,b) => b[1].수량-a[1].수량)
+    .sort((a,b) => b[1].금액-a[1].금액)
     .map(([nm, v]) => {
       const catClass = v.분류==='호두과자'?'cat-walnut':v.분류==='답례품'?'cat-gift':'cat-side';
       const pct = totalAmt ? (v.금액/totalAmt*100).toFixed(1) : '0.0';
@@ -2569,7 +2569,7 @@ function openMenuStoreModal(storeName, totalQty, totalAmt, menusJsonStr) {
           <th style="min-width:160px;">메뉴명</th>
           <th style="min-width:60px;">분류</th>
           <th style="text-align:right;min-width:70px;">수량</th>
-          <th style="text-align:right;min-width:55px;">비율</th>
+          <th style="text-align:right;min-width:55px;">매출비율</th>
           <th style="text-align:right;min-width:90px;">금액</th>
         </tr></thead>
         <tbody>${rows}</tbody>
