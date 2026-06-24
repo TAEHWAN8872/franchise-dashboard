@@ -2069,6 +2069,7 @@ function onMenuMonthClick(monthIdx) {
   document.getElementById('menuPanel').classList.add('open');
   currentMenuManager = '전체';
   currentMenuRegion = '전체';
+  currentMenuRegionTabMode = 'stores';
   currentMenuSubtab = 'region';
   document.querySelectorAll('#menuSubtabRow .menu-subtab').forEach(b => b.classList.toggle('active', b.dataset.subtab==='region'));
   document.getElementById('menuRegionView').style.display = '';
@@ -2101,6 +2102,9 @@ let currentMenuRegion = '전체';
 
 const REGION_COLORS_MAP = {"서울": "#3b82f6", "경기": "#22c55e", "인천": "#06b6d4", "부산": "#f97316", "대구": "#a855f7", "광주": "#ec4899", "대전": "#facc15", "울산": "#14b8a6", "세종": "#84cc16", "충북": "#fb923c", "충남": "#f43f5e", "경북": "#8b5cf6", "경남": "#0ea5e9", "전북": "#d946ef", "전남": "#10b981", "강원": "#f59e0b", "기타": "#6b7280"};
 
+// 지역 탭/테이블 클릭 모드: 'stores'=매장 리스트, 'menus'=메뉴 현황
+let currentMenuRegionTabMode = 'stores';
+
 function renderMenuRegionTabs() {
   const el = document.getElementById('menuRegionTabs');
   if (!el) return;
@@ -2111,8 +2115,8 @@ function renderMenuRegionTabs() {
 
   el.innerHTML = regions.map(reg => {
     const color = reg === '전체' ? '#7eb8e8' : (REGION_COLORS_MAP[reg] || '#6b8fa8');
-    const isActive = currentMenuRegion === reg;
-    return `<button onclick="selectMenuRegion('${reg}')"
+    const isActive = currentMenuRegion === reg && currentMenuRegionTabMode === 'stores';
+    return `<button onclick="selectMenuRegionTab('${reg}')"
       style="font-size:11px;padding:4px 11px;border-radius:6px;cursor:pointer;
       border:1px solid ${isActive ? color : '#1e3347'};
       color:${isActive ? color : '#6b8fa8'};
@@ -2121,8 +2125,18 @@ function renderMenuRegionTabs() {
   }).join('');
 }
 
+// 지역 탭 클릭 → 매장 리스트
+function selectMenuRegionTab(reg) {
+  currentMenuRegion = reg;
+  currentMenuRegionTabMode = 'stores';
+  renderMenuRegionTabs();
+  renderMenuRegionView();
+}
+
+// 테이블 지역명 클릭 → 메뉴/상품 현황
 function selectMenuRegion(reg) {
   currentMenuRegion = reg;
+  currentMenuRegionTabMode = 'menus';
   renderMenuRegionTabs();
   renderMenuRegionView();
 }
@@ -2131,7 +2145,84 @@ function renderMenuRegionView() {
   renderMenuRegionTabs();
   const data = MENU_DATA_BY_MONTH[currentMenuMonth] || [];
 
-  // ── 전체: 지역 카드 요약 ──
+  // ── 지역 탭 클릭 → 매장 리스트 모드 ──
+  if (currentMenuRegionTabMode === 'stores' && currentMenuRegion !== '전체') {
+    const filteredData = data.filter(r => getRegionForStore(r.매장) === currentMenuRegion);
+    const color = REGION_COLORS_MAP[currentMenuRegion] || '#6b8fa8';
+
+    const storeMap = {};
+    filteredData.forEach(r => {
+      const s = r.매장;
+      if (!storeMap[s]) storeMap[s] = { totalQty: 0, totalAmt: 0, 호두과자Amt: 0, 답례품Amt: 0, 사이드Amt: 0, menus: {} };
+      const cat = getCategory(r.상품명);
+      const qty = r.수량 || 0;
+      const amt = qty * (PRICE_MAP[r.상품명] || 0);
+      storeMap[s].totalQty += qty;
+      storeMap[s].totalAmt += amt;
+      storeMap[s][cat+'Amt'] = (storeMap[s][cat+'Amt'] || 0) + amt;
+      if (!storeMap[s].menus[r.상품명]) storeMap[s].menus[r.상품명] = { cat, qty: 0, amt: 0 };
+      storeMap[s].menus[r.상품명].qty += qty;
+      storeMap[s].menus[r.상품명].amt += amt;
+    });
+
+    const regTotalQty = Object.values(storeMap).reduce((s, v) => s + v.totalQty, 0);
+    const regTotalAmt = Object.values(storeMap).reduce((s, v) => s + v.totalAmt, 0);
+
+    const storeRows = Object.entries(storeMap)
+      .sort((a, b) => b[1].totalAmt - a[1].totalAmt)
+      .map(([storeName, v]) => {
+        const hPct = v.totalAmt ? (v.호두과자Amt/v.totalAmt*100).toFixed(0) : 0;
+        const gPct = v.totalAmt ? (v.답례품Amt/v.totalAmt*100).toFixed(0) : 0;
+        const sPct = v.totalAmt ? (v.사이드Amt/v.totalAmt*100).toFixed(0) : 0;
+        const menusJson = encodeURIComponent(JSON.stringify({ storeName, menus: v.menus, totalQty: v.totalQty, totalAmt: v.totalAmt }));
+        return `<tr style="cursor:pointer;" onclick="openMenuRegionStoreModal('${storeName}', ${v.totalQty}, ${v.totalAmt}, decodeURIComponent('${menusJson}'))"
+          onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
+          <td style="color:#c8dff0;font-weight:600;">${storeName}</td>
+          <td>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <span class="menu-cat-badge cat-walnut" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>호두과자 ${hPct}%</span><span style="opacity:0.8;">${fmtAmt(v.호두과자Amt)}</span></span>
+              <span class="menu-cat-badge cat-gift" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>답례품 ${gPct}%</span><span style="opacity:0.8;">${fmtAmt(v.답례품Amt)}</span></span>
+              <span class="menu-cat-badge cat-side" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>사이드 ${sPct}%</span><span style="opacity:0.8;">${fmtAmt(v.사이드Amt)}</span></span>
+            </div>
+          </td>
+          <td class="val">${v.totalQty.toLocaleString()}</td>
+          <td class="pct">${regTotalAmt ? (v.totalAmt/regTotalAmt*100).toFixed(1) : 0}%</td>
+          <td class="amt">${fmtAmt(v.totalAmt)}</td>
+        </tr>`;
+      }).join('');
+
+    document.getElementById('menuRegionList').innerHTML = `
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
+          <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">매장 수</div>
+          <div style="font-size:18px;font-weight:700;color:${color};">${Object.keys(storeMap).length}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개점</span></div>
+        </div>
+        <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
+          <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 판매수량</div>
+          <div style="font-size:18px;font-weight:700;color:#e0f0ff;">${regTotalQty.toLocaleString()}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개</span></div>
+        </div>
+        <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
+          <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
+          <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(regTotalAmt)}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">매장별 판매 현황 <span style="font-size:10px;color:#4a6a8a;">(클릭 시 메뉴 상세)</span></div>
+      <div style="overflow-x:auto;">
+        <table class="menu-tbl">
+          <thead><tr>
+            <th style="min-width:130px;">매장명</th>
+            <th style="min-width:200px;">카테고리별 구성 (% · 금액)</th>
+            <th style="text-align:right;min-width:70px;">수량</th>
+            <th style="text-align:right;min-width:55px;">매출비율</th>
+            <th style="text-align:right;min-width:90px;">총 금액</th>
+          </tr></thead>
+          <tbody>${storeRows}</tbody>
+        </table>
+      </div>`;
+    return;
+  }
+
+  // ── 전체 또는 테이블 지역 클릭 진입 ──
   if (currentMenuRegion === '전체') {
     const regionMap = {};
     data.forEach(r => {
@@ -2162,7 +2253,7 @@ function renderMenuRegionView() {
           <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(totalAmt)}</div>
         </div>
       </div>
-      <div style="font-size:11px;color:#6b8fa8;margin-bottom:8px;">지역별 판매 현황 <span style="font-size:10px;color:#4a6a8a;">(지역 탭 선택 시 매장 상세)</span></div>
+      <div style="font-size:11px;color:#6b8fa8;margin-bottom:8px;">지역별 판매 현황 <span style="font-size:10px;color:#4a6a8a;">· 지역명 클릭 → 상품별 현황 &nbsp;|&nbsp; 위 탭 클릭 → 매장 리스트</span></div>
       <div style="overflow-x:auto;">
         <table class="menu-tbl">
           <thead><tr>
@@ -2290,33 +2381,17 @@ function renderMenuRegionView() {
       </div>
     </div>
 
-    <div style="margin-bottom:14px;">
-      <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">메뉴별 판매 현황</div>
-      <div style="overflow-x:auto;">
-        <table class="menu-tbl">
-          <thead><tr>
-            <th style="min-width:160px;">메뉴명</th>
-            <th style="min-width:60px;">분류</th>
-            <th style="text-align:right;min-width:70px;">수량</th>
-            <th style="text-align:right;min-width:55px;">매출비율</th>
-            <th style="text-align:right;min-width:90px;">금액</th>
-          </tr></thead>
-          <tbody>${menuRows}</tbody>
-        </table>
-      </div>
-    </div>
-
-    <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;margin-top:4px;">매장별 판매 현황 <span style="font-size:10px;color:#4a6a8a;">(클릭 시 메뉴 상세)</span></div>
+    <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">메뉴별 판매 현황</div>
     <div style="overflow-x:auto;">
       <table class="menu-tbl">
         <thead><tr>
-          <th style="min-width:130px;">매장명</th>
-          <th style="min-width:200px;">카테고리별 구성 (% · 금액)</th>
+          <th style="min-width:160px;">메뉴명</th>
+          <th style="min-width:60px;">분류</th>
           <th style="text-align:right;min-width:70px;">수량</th>
           <th style="text-align:right;min-width:55px;">매출비율</th>
-          <th style="text-align:right;min-width:90px;">총 금액</th>
+          <th style="text-align:right;min-width:90px;">금액</th>
         </tr></thead>
-        <tbody>${storeRows}</tbody>
+        <tbody>${menuRows}</tbody>
       </table>
     </div>`;
 }
