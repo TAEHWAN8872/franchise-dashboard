@@ -234,15 +234,20 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
     <span style="font-size:10px;color:#6b8fa8;white-space:nowrap;">메&nbsp;&nbsp;&nbsp;&nbsp;뉴</span>
     <div class="tabs" id="menuMonthTabs" style="margin-bottom:0;"></div>
   </div>
-  <!-- 메뉴 분석 패널 -->
-  <div id="menuPanel" style="display:none;margin-bottom:14px;">
-    <div class="card" style="padding:16px;">
+  <!-- 메뉴 분석 메인 모달 -->
+  <div class="modal-overlay" id="menuPanel">
+    <div class="modal-box" style="max-width:900px;max-height:90vh;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:13px;font-weight:700;color:#e0f0ff;" id="menuPanelTitle">1월 메뉴별 판매 현황</div>
-        <button onclick="closeMenuPanel()" style="background:transparent;border:none;color:#6b8fa8;font-size:16px;cursor:pointer;">✕</button>
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#e0f0ff;" id="menuPanelTitle">1월 메뉴별 판매 현황</div>
+          <div style="font-size:11px;color:#6b8fa8;margin-top:2px;">담당자 탭 선택 → 전체: 메뉴 요약 / 담당자: 매장별 현황</div>
+        </div>
+        <button onclick="closeMenuPanel()" class="modal-close" style="position:static;">✕</button>
       </div>
-      <!-- 메뉴 서브탭 -->
-      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <!-- 담당자 탭 -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;" id="menuManagerTabs"></div>
+      <!-- 서브탭 (지역별/담당자별) -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;" id="menuSubtabRow">
         <button class="menu-subtab active" data-subtab="region" onclick="switchMenuSubtab('region')">지역별</button>
         <button class="menu-subtab" data-subtab="manager" onclick="switchMenuSubtab('manager')">담당자별</button>
       </div>
@@ -253,7 +258,6 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       </div>
       <!-- 담당자별 뷰 -->
       <div id="menuManagerView" style="display:none;">
-        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center;" id="menuManagerTabs"></div>
         <div id="menuManagerList"></div>
       </div>
     </div>
@@ -265,6 +269,16 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       <div class="modal-sub" id="menuRegionModalSub"></div>
       <button class="modal-close" onclick="closeMenuRegionModal()">✕</button>
       <div id="menuRegionModalBody"></div>
+    </div>
+  </div>
+
+  <!-- 매장 메뉴 상세 모달 -->
+  <div class="modal-overlay" id="menuStoreModal">
+    <div class="modal-box" style="max-width:620px;max-height:88vh;">
+      <div class="modal-title" id="menuStoreModalTitle"></div>
+      <div class="modal-sub" id="menuStoreModalSub"></div>
+      <button class="modal-close" onclick="closeMenuStoreModal()">✕</button>
+      <div id="menuStoreModalBody"></div>
     </div>
   </div>
   <!-- 매장 검색 -->
@@ -2032,13 +2046,18 @@ function onMenuMonthClick(monthIdx) {
     return;
   }
   currentMenuMonth = monthIdx;
-  document.getElementById('menuPanel').style.display = 'block';
   document.getElementById('menuPanelTitle').textContent = `${monthIdx}월 메뉴별 판매 현황`;
+  document.getElementById('menuPanel').classList.add('open');
+  currentMenuManager = '전체';
+  currentMenuSubtab = 'region';
+  document.querySelectorAll('#menuSubtabRow .menu-subtab').forEach(b => b.classList.toggle('active', b.dataset.subtab==='region'));
+  document.getElementById('menuRegionView').style.display = '';
+  document.getElementById('menuManagerView').style.display = 'none';
   renderMenuView();
 }
 
 function closeMenuPanel() {
-  document.getElementById('menuPanel').style.display = 'none';
+  document.getElementById('menuPanel').classList.remove('open');
   document.querySelectorAll('#menuMonthTabs .tab').forEach(b => b.classList.remove('active'));
   currentMenuMonth = null;
 }
@@ -2146,176 +2165,219 @@ let currentMenuManager = '전체';
 function renderMenuManagerTabs() {
   const el = document.getElementById('menuManagerTabs');
   if (!el) return;
-  const ORDER = ['전체', '김태환 과장', '임도형 과장', '이중섭 대리', '박영태 대리', '강동우 사원', '임시매장'];
+  const ORDER = ['전체','김태환 과장','임도형 과장','이중섭 대리','박영태 대리','강동우 사원','임시매장'];
   const mgrColors = {
-    '김태환 과장': '#22c55e', '임도형 과장': '#ef4444',
-    '이중섭 대리': '#facc15', '박영태 대리': '#3b82f6',
-    '강동우 사원': '#a855f7', '임시매장': '#6b7280',
+    '김태환 과장':'#22c55e','임도형 과장':'#ef4444',
+    '이중섭 대리':'#facc15','박영태 대리':'#3b82f6',
+    '강동우 사원':'#a855f7','임시매장':'#6b7280'
   };
   el.innerHTML = ORDER.map(mgr => {
     const color = mgr === '전체' ? '#7eb8e8' : (mgrColors[mgr] || '#6b8fa8');
     const isActive = currentMenuManager === mgr;
-    const activeStyle = isActive ? `background:${color}22;border-color:${color};color:${color};font-weight:700;` : '';
-    return `<button onclick="selectMenuManager('${mgr}')" style="font-size:11px;padding:4px 12px;border-radius:6px;cursor:pointer;border:1px solid ${isActive ? color : '#1e3347'};color:${isActive ? color : '#6b8fa8'};background:${isActive ? color+'22' : 'transparent'};transition:all .2s;${activeStyle}">${mgr}</button>`;
+    return `<button onclick="selectMenuManager('${mgr}')"
+      style="font-size:11px;padding:4px 12px;border-radius:6px;cursor:pointer;
+      border:1px solid ${isActive ? color : '#1e3347'};
+      color:${isActive ? color : '#6b8fa8'};
+      background:${isActive ? color+'22' : 'transparent'};
+      font-weight:${isActive ? '700' : '400'};transition:all .2s;">${mgr}</button>`;
   }).join('');
 }
 
 function selectMenuManager(mgr) {
   currentMenuManager = mgr;
   renderMenuManagerTabs();
-  renderMenuManagerView();
+  // 전체: 지역별/담당자별 서브탭 표시 / 담당자: 서브탭 숨기고 담당자뷰 강제
+  if (mgr === '전체') {
+    document.getElementById('menuSubtabRow').style.display = '';
+    switchMenuSubtab(currentMenuSubtab || 'region');
+  } else {
+    document.getElementById('menuSubtabRow').style.display = 'none';
+    document.getElementById('menuRegionView').style.display = 'none';
+    document.getElementById('menuManagerView').style.display = '';
+    renderMenuManagerView();
+  }
 }
 
 function renderMenuManagerView() {
   renderMenuManagerTabs();
   const data = MENU_DATA_BY_MONTH[currentMenuMonth] || [];
   const mgrColors = {
-    '김태환 과장': '#22c55e', '임도형 과장': '#ef4444',
-    '이중섭 대리': '#facc15', '박영태 대리': '#3b82f6',
-    '강동우 사원': '#a855f7', '임시매장': '#6b7280',
+    '김태환 과장':'#22c55e','임도형 과장':'#ef4444',
+    '이중섭 대리':'#facc15','박영태 대리':'#3b82f6',
+    '강동우 사원':'#a855f7','임시매장':'#6b7280'
   };
 
-  // 담당자 필터 적용
-  const filteredData = currentMenuManager === '전체'
-    ? data
-    : data.filter(r => getManagerForStore(r.매장) === currentMenuManager);
-
-  // 메뉴별 집계 (상품명 → {수량, 금액})
-  const menuMap = {};
-  filteredData.forEach(r => {
-    const key = r.상품명;
-    if (!menuMap[key]) menuMap[key] = { 분류: r.상품분류, 수량: 0, 금액: 0 };
-    menuMap[key].수량 += r.수량 || 0;
-    menuMap[key].금액 += (r.수량 || 0) * (PRICE_MAP[r.상품명] || 0);
-  });
-
-  // 매장별 집계 (담당자 필터 적용)
-  const mgrMap = {};
-  filteredData.forEach(r => {
-    const mgr = getManagerForStore(r.매장);
-    if (!mgrMap[mgr]) mgrMap[mgr] = {};
-    if (!mgrMap[mgr][r.매장]) mgrMap[mgr][r.매장] = {};
-    const key = r.상품명;
-    if (!mgrMap[mgr][r.매장][key]) mgrMap[mgr][r.매장][key] = { 분류: r.상품분류, 수량: 0, 금액: 0 };
-    mgrMap[mgr][r.매장][key].수량 += r.수량 || 0;
-    mgrMap[mgr][r.매장][key].금액 += (r.수량 || 0) * (PRICE_MAP[r.상품명] || 0);
-  });
-
-  const totalQty = filteredData.reduce((s, r) => s + (r.수량 || 0), 0);
-  const totalAmt = filteredData.reduce((s, r) => s + (r.수량 || 0) * (PRICE_MAP[r.상품명] || 0), 0);
-
-  // 상단 요약 (전체 메뉴 랭킹)
-  const menuRanking = Object.entries(menuMap)
-    .sort((a, b) => b[1].수량 - a[1].수량);
-
-  const summaryHtml = `
-    <div style="margin-bottom:14px;">
-      <div style="display:flex;gap:12px;margin-bottom:10px;">
+  // ── 전체 선택 시: 메뉴별 요약 테이블만 ──
+  if (currentMenuManager === '전체') {
+    const menuMap = {};
+    data.forEach(r => {
+      const nm = r.상품명;
+      if (!menuMap[nm]) menuMap[nm] = { 분류: r.상품분류, 수량: 0, 금액: 0 };
+      menuMap[nm].수량 += r.수량 || 0;
+      menuMap[nm].금액 += (r.수량 || 0) * (PRICE_MAP[nm] || 0);
+    });
+    const totalQty = Object.values(menuMap).reduce((s,v) => s+v.수량, 0);
+    const totalAmt = Object.values(menuMap).reduce((s,v) => s+v.금액, 0);
+    const rows = Object.entries(menuMap).sort((a,b) => b[1].수량-a[1].수량).map(([nm,v]) => {
+      const catClass = v.분류==='호두과자'?'cat-walnut':v.분류==='답례품'?'cat-gift':'cat-side';
+      const pct = totalQty ? (v.수량/totalQty*100).toFixed(1) : '0.0';
+      return `<tr>
+        <td>${nm}</td>
+        <td><span class="menu-cat-badge ${catClass}">${v.분류}</span></td>
+        <td class="val">${v.수량.toLocaleString()}</td>
+        <td class="pct">${pct}%</td>
+        <td class="amt">${Math.round(v.금액/10000).toLocaleString()}만원</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('menuManagerList').innerHTML = `
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
         <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;">
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 판매수량</div>
           <div style="font-size:18px;font-weight:700;color:#e0f0ff;">${totalQty.toLocaleString()}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개</span></div>
         </div>
         <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;">
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
-          <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${(totalAmt/10000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',')}만원</div>
+          <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${Math.round(totalAmt/10000).toLocaleString()}만원</div>
         </div>
       </div>
       <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">메뉴별 판매 현황</div>
       <div style="overflow-x:auto;">
-        <table class="menu-tbl" style="min-width:460px;">
+        <table class="menu-tbl">
           <thead><tr>
-            <th>메뉴명</th><th>분류</th>
-            <th style="text-align:right;">수량</th>
-            <th style="text-align:right;">비율</th>
-            <th style="text-align:right;">금액</th>
+            <th style="min-width:160px;">메뉴명</th>
+            <th style="min-width:60px;">분류</th>
+            <th style="text-align:right;min-width:70px;">수량</th>
+            <th style="text-align:right;min-width:55px;">비율</th>
+            <th style="text-align:right;min-width:90px;">금액</th>
           </tr></thead>
-          <tbody>
-          ${menuRanking.map(([name, v]) => {
-            const catClass = v.분류 === '호두과자' ? 'cat-walnut' : v.분류 === '답례품' ? 'cat-gift' : 'cat-side';
-            const pct = totalQty ? (v.수량 / totalQty * 100).toFixed(1) : '0.0';
-            return `<tr>
-              <td>${name}</td>
-              <td><span class="menu-cat-badge ${catClass}">${v.분류}</span></td>
-              <td class="val">${v.수량.toLocaleString()}</td>
-              <td class="pct">${pct}%</td>
-              <td class="amt">${(v.금액/10000).toFixed(1)}만원</td>
-            </tr>`;
-          }).join('')}
-          </tbody>
+          <tbody>${rows}</tbody>
         </table>
-      </div>
-    </div>`;
-
-  // 담당자별 매장 상세
-  const ORDER = ['김태환 과장', '임도형 과장', '이중섭 대리', '박영태 대리', '강동우 사원', '임시매장'];
-  const detailHtml = Object.entries(mgrMap)
-    .sort((a, b) => {
-      const oa = ORDER.indexOf(a[0]), ob = ORDER.indexOf(b[0]);
-      return (oa === -1 ? 99 : oa) - (ob === -1 ? 99 : ob);
-    })
-    .map(([mgr, stores]) => {
-      const color = mgrColors[mgr] || '#6b8fa8';
-      const mgrQty = Object.values(stores).reduce((s, v) => s + Object.values(v).reduce((ss, vv) => ss + vv.수량, 0), 0);
-      const mgrAmt = Object.values(stores).reduce((s, v) => s + Object.values(v).reduce((ss, vv) => ss + vv.금액, 0), 0);
-
-      const storeRows = Object.entries(stores)
-        .sort((a, b) => {
-          const qa = Object.values(a[1]).reduce((s, v) => s + v.수량, 0);
-          const qb = Object.values(b[1]).reduce((s, v) => s + v.수량, 0);
-          return qb - qa;
-        })
-        .map(([storeName, menus]) => {
-          const storeQty = Object.values(menus).reduce((s, v) => s + v.수량, 0);
-          const storeAmt = Object.values(menus).reduce((s, v) => s + v.금액, 0);
-          const menuDetail = Object.entries(menus)
-            .sort((a, b) => b[1].수량 - a[1].수량)
-            .map(([mn, mv]) => {
-              const catClass = mv.분류 === '호두과자' ? 'cat-walnut' : mv.분류 === '답례품' ? 'cat-gift' : 'cat-side';
-              return `<tr>
-                <td style="padding-left:14px;color:#8aaccc;">${mn}</td>
-                <td><span class="menu-cat-badge ${catClass}" style="font-size:8px;">${mv.분류}</span></td>
-                <td class="val" style="font-size:10px;">${mv.수량.toLocaleString()}</td>
-                <td class="pct" style="font-size:10px;">${storeQty ? (mv.수량/storeQty*100).toFixed(0) : 0}%</td>
-                <td class="amt" style="font-size:10px;">${(mv.금액/10000).toFixed(1)}만원</td>
-              </tr>`;
-            }).join('');
-          return `
-            <tr style="background:#111e2e;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
-              <td style="font-weight:600;color:#c8dff0;">${storeName}</td>
-              <td></td>
-              <td class="val">${storeQty.toLocaleString()}</td>
-              <td class="pct">${mgrQty ? (storeQty/mgrQty*100).toFixed(1) : 0}%</td>
-              <td class="amt">${(storeAmt/10000).toFixed(1)}만원</td>
-            </tr>
-            <tr style="display:none;"><td colspan="5" style="padding:0;">
-              <table class="menu-tbl" style="background:#0d1b2a;border-radius:0;margin:0;">${menuDetail}</table>
-            </td></tr>`;
-        }).join('');
-
-      return `<div class="store-menu-row" style="border-color:${color}33;margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <span style="color:${color};font-size:12px;font-weight:700;">● ${mgr}</span>
-          <span style="font-size:11px;color:#6b8fa8;">${mgrQty.toLocaleString()}개 · ${(mgrAmt/10000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',')}만원</span>
-        </div>
-        <div style="overflow-x:auto;">
-          <table class="menu-tbl" style="min-width:380px;">
-            <thead><tr>
-              <th>매장명 <span style="font-size:9px;color:#4a6a8a;">(클릭시 메뉴 상세)</span></th>
-              <th>분류</th>
-              <th style="text-align:right;">수량</th>
-              <th style="text-align:right;">비율</th>
-              <th style="text-align:right;">금액</th>
-            </tr></thead>
-            <tbody>${storeRows}</tbody>
-          </table>
-        </div>
       </div>`;
+    return;
+  }
+
+  // ── 담당자 선택 시: 매장별 테이블 (호두% / 답례% / 사이드% / 총금액) ──
+  const filteredData = data.filter(r => getManagerForStore(r.매장) === currentMenuManager);
+  const color = mgrColors[currentMenuManager] || '#6b8fa8';
+
+  // 매장별 집계
+  const storeMap = {};
+  filteredData.forEach(r => {
+    const s = r.매장;
+    if (!storeMap[s]) storeMap[s] = { 호두과자: 0, 답례품: 0, 사이드: 0, totalQty: 0, totalAmt: 0, menus: {} };
+    const cat = getCategory(r.상품명);
+    storeMap[s][cat] = (storeMap[s][cat] || 0) + (r.수량 || 0);
+    storeMap[s].totalQty += r.수량 || 0;
+    storeMap[s].totalAmt += (r.수량 || 0) * (PRICE_MAP[r.상품명] || 0);
+    if (!storeMap[s].menus[r.상품명]) storeMap[s].menus[r.상품명] = { 분류: r.상품분류, 수량: 0, 금액: 0 };
+    storeMap[s].menus[r.상품명].수량 += r.수량 || 0;
+    storeMap[s].menus[r.상품명].금액 += (r.수량 || 0) * (PRICE_MAP[r.상품명] || 0);
+  });
+
+  const mgrTotalQty = Object.values(storeMap).reduce((s,v) => s+v.totalQty, 0);
+  const mgrTotalAmt = Object.values(storeMap).reduce((s,v) => s+v.totalAmt, 0);
+
+  const storeRows = Object.entries(storeMap)
+    .sort((a,b) => b[1].totalQty - a[1].totalQty)
+    .map(([storeName, v]) => {
+      const hPct = v.totalQty ? (v.호두과자/v.totalQty*100).toFixed(0) : 0;
+      const gPct = v.totalQty ? (v.답례품/v.totalQty*100).toFixed(0) : 0;
+      const sPct = v.totalQty ? (v.사이드/v.totalQty*100).toFixed(0) : 0;
+      const menusJson = encodeURIComponent(JSON.stringify({ storeName, menus: v.menus, totalQty: v.totalQty, totalAmt: v.totalAmt }));
+      return `<tr style="cursor:pointer;" onclick="openMenuStoreModal('${storeName}', ${v.totalQty}, ${v.totalAmt}, decodeURIComponent('${menusJson}'))"
+        onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
+        <td style="color:#c8dff0;font-weight:600;">${storeName}</td>
+        <td style="text-align:center;">
+          <span class="menu-cat-badge cat-walnut">${hPct}%</span>
+          <span class="menu-cat-badge cat-gift" style="margin-left:3px;">${gPct}%</span>
+          <span class="menu-cat-badge cat-side" style="margin-left:3px;">${sPct}%</span>
+        </td>
+        <td class="val">${v.totalQty.toLocaleString()}</td>
+        <td class="pct">${mgrTotalQty ? (v.totalQty/mgrTotalQty*100).toFixed(1) : 0}%</td>
+        <td class="amt">${Math.round(v.totalAmt/10000).toLocaleString()}만원</td>
+      </tr>`;
     }).join('');
 
-  document.getElementById('menuManagerList').innerHTML = summaryHtml + `
-    <div style="font-size:11px;color:#6b8fa8;margin-bottom:8px;margin-top:4px;">담당자별 매장 상세 <span style="font-size:10px;">(매장명 클릭시 메뉴별 상세 펼치기)</span></div>
-    ${detailHtml}`;
+  document.getElementById('menuManagerList').innerHTML = `
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
+        <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">담당 매장 수</div>
+        <div style="font-size:18px;font-weight:700;color:${color};">${Object.keys(storeMap).length}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개점</span></div>
+      </div>
+      <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
+        <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 판매수량</div>
+        <div style="font-size:18px;font-weight:700;color:#e0f0ff;">${mgrTotalQty.toLocaleString()}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개</span></div>
+      </div>
+      <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
+        <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
+        <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${Math.round(mgrTotalAmt/10000).toLocaleString()}만원</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">매장별 판매 현황 <span style="font-size:10px;color:#4a6a8a;">(클릭 시 메뉴 상세)</span></div>
+    <div style="overflow-x:auto;">
+      <table class="menu-tbl">
+        <thead><tr>
+          <th style="min-width:130px;">매장명</th>
+          <th style="min-width:130px;text-align:center;">호두과자% / 답례품% / 사이드%</th>
+          <th style="text-align:right;min-width:70px;">수량</th>
+          <th style="text-align:right;min-width:55px;">비율</th>
+          <th style="text-align:right;min-width:90px;">총 금액</th>
+        </tr></thead>
+        <tbody>${storeRows}</tbody>
+      </table>
+    </div>`;
 }
+
+// ── 매장 메뉴 상세 모달 ──
+function openMenuStoreModal(storeName, totalQty, totalAmt, menusJsonStr) {
+  let menusData;
+  try { menusData = JSON.parse(menusJsonStr); } catch(e) { return; }
+  const menus = menusData.menus || {};
+
+  document.getElementById('menuStoreModalTitle').textContent = storeName + ' — 메뉴별 상세';
+  document.getElementById('menuStoreModalSub').textContent =
+    `총 ${totalQty.toLocaleString()}개 · ${Math.round(totalAmt/10000).toLocaleString()}만원`;
+
+  const rows = Object.entries(menus)
+    .sort((a,b) => b[1].수량-a[1].수량)
+    .map(([nm, v]) => {
+      const catClass = v.분류==='호두과자'?'cat-walnut':v.분류==='답례품'?'cat-gift':'cat-side';
+      const pct = totalQty ? (v.수량/totalQty*100).toFixed(1) : '0.0';
+      return `<tr>
+        <td style="min-width:160px;">${nm}</td>
+        <td><span class="menu-cat-badge ${catClass}">${v.분류}</span></td>
+        <td class="val" style="min-width:70px;">${v.수량.toLocaleString()}</td>
+        <td class="pct" style="min-width:55px;">${pct}%</td>
+        <td class="amt" style="min-width:90px;">${Math.round(v.금액/10000).toLocaleString()}만원</td>
+      </tr>`;
+    }).join('');
+
+  document.getElementById('menuStoreModalBody').innerHTML = `
+    <div style="overflow-x:auto;">
+      <table class="menu-tbl">
+        <thead><tr>
+          <th style="min-width:160px;">메뉴명</th>
+          <th style="min-width:60px;">분류</th>
+          <th style="text-align:right;min-width:70px;">수량</th>
+          <th style="text-align:right;min-width:55px;">비율</th>
+          <th style="text-align:right;min-width:90px;">금액</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  document.getElementById('menuStoreModal').classList.add('open');
+}
+
+function closeMenuStoreModal() {
+  document.getElementById('menuStoreModal').classList.remove('open');
+}
+
+document.addEventListener('click', function(e) {
+  const storeModal = document.getElementById('menuStoreModal');
+  if (storeModal && e.target === storeModal) closeMenuStoreModal();
+  const menuPanel = document.getElementById('menuPanel');
+  if (menuPanel && e.target === menuPanel) closeMenuPanel();
+});
 
 // 모든 변수/함수 정의 후 메뉴 탭 렌더링
 // 모든 변수/함수 정의 후 메뉴 탭 렌더링
