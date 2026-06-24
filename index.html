@@ -2032,9 +2032,14 @@ function getCategory(상품명) {
 }
 
 // 매장의 지역 찾기
+const STORE_REGION_OVERRIDE = {
+  '파주운정점': '경기',
+  '잠실석촌고분역점': '서울',
+};
 function getRegionForStore(storeName) {
+  if (STORE_REGION_OVERRIDE[storeName]) return STORE_REGION_OVERRIDE[storeName];
   const found = ALL.find(b => b.name === storeName);
-  return found ? found.region : '기타';
+  return found ? found.region : null;
 }
 function getManagerForStore(storeName) {
   const found = ALL.find(b => b.name === storeName);
@@ -2110,7 +2115,7 @@ function renderMenuRegionTabs() {
   if (!el) return;
   const data = MENU_DATA_BY_MONTH[currentMenuMonth] || [];
   const regions = ['전체', ...Object.keys(
-    data.reduce((acc, r) => { acc[getRegionForStore(r.매장)] = 1; return acc; }, {})
+    data.reduce((acc, r) => { const reg = getRegionForStore(r.매장); if (reg) acc[reg] = 1; return acc; }, {})
   ).sort()];
 
   el.innerHTML = regions.map(reg => {
@@ -2227,6 +2232,7 @@ function renderMenuRegionView() {
     const regionMap = {};
     data.forEach(r => {
       const reg = getRegionForStore(r.매장);
+      if (!reg) return; // 지역 불명 매장 제외
       if (!regionMap[reg]) regionMap[reg] = { qty: 0, amt: 0, stores: new Set(), 호두과자: 0, 답례품: 0, 사이드: 0, 호두과자Amt: 0, 답례품Amt: 0, 사이드Amt: 0 };
       const price = PRICE_MAP[r.상품명] || 0;
       const qty = r.수량 || 0;
