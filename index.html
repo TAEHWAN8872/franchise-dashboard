@@ -2259,7 +2259,7 @@ function renderMenuRegionView() {
       if (!storeMap[s]) storeMap[s] = { totalQty:0, totalAmt:0, menus:{} };
       const qty = r.수량||0, amt = qty*(PRICE_MAP[r.상품명]||0);
       storeMap[s].totalQty += qty; storeMap[s].totalAmt += amt;
-      if (!storeMap[s].menus[r.상품명]) storeMap[s].menus[r.상품명]={qty:0,amt:0};
+      if (!storeMap[s].menus[r.상품명]) storeMap[s].menus[r.상품명]={cat:getCategory(r.상품명),qty:0,amt:0};
       storeMap[s].menus[r.상품명].qty += qty;
       storeMap[s].menus[r.상품명].amt += amt;
     });
@@ -2535,7 +2535,7 @@ function renderMenuRegionView() {
     if(!storeMap[s]) storeMap[s]={totalQty:0,totalAmt:0,menus:{}};
     const qty=r.수량||0, amt=qty*(PRICE_MAP[r.상품명]||0);
     storeMap[s].totalQty+=qty; storeMap[s].totalAmt+=amt;
-    if(!storeMap[s].menus[r.상품명]) storeMap[s].menus[r.상품명]={qty:0,amt:0};
+    if(!storeMap[s].menus[r.상품명]) storeMap[s].menus[r.상품명]={cat:getCategory(r.상품명),qty:0,amt:0};
     storeMap[s].menus[r.상품명].qty+=qty;
     storeMap[s].menus[r.상품명].amt+=amt;
   });
@@ -2653,11 +2653,12 @@ function openMenuRegionStoreModal(storeName, totalQty, totalAmt, menusJsonStr) {
   const rows = Object.entries(menus)
     .sort((a, b) => b[1].amt - a[1].amt)
     .map(([nm, v]) => {
-      const catClass = v.cat==='호두과자'?'cat-walnut':v.cat==='답례품'?'cat-gift':'cat-side';
+      const cat = v.cat || getCategory(nm);
+      const catClass = cat==='호두과자'?'cat-walnut':cat==='답례품'?'cat-gift':'cat-side';
       const pct = totalAmt ? (v.amt/totalAmt*100).toFixed(1) : '0.0';
       return `<tr>
         <td style="min-width:160px;">${nm}</td>
-        <td><span class="menu-cat-badge ${catClass}">${v.cat}</span></td>
+        <td><span class="menu-cat-badge ${catClass}">${cat}</span></td>
         <td class="val" style="min-width:70px;">${v.qty.toLocaleString()}</td>
         <td class="pct" style="min-width:55px;">${pct}%</td>
         <td class="amt" style="min-width:90px;">${fmtAmt(v.amt)}</td>
@@ -2893,16 +2894,19 @@ function openMenuStoreModal(storeName, totalQty, totalAmt, menusJsonStr) {
     `총 ${totalQty.toLocaleString()}개 · ${fmtAmt(totalAmt)}`;
 
   const rows = Object.entries(menus)
-    .sort((a,b) => b[1].금액-a[1].금액)
+    .sort((a,b) => (b[1].금액||b[1].amt||0)-(a[1].금액||a[1].amt||0))
     .map(([nm, v]) => {
-      const catClass = v.분류==='호두과자'?'cat-walnut':v.분류==='답례품'?'cat-gift':'cat-side';
-      const pct = totalAmt ? (v.금액/totalAmt*100).toFixed(1) : '0.0';
+      const cat = v.분류 || v.cat || getCategory(nm);
+      const catClass = cat==='호두과자'?'cat-walnut':cat==='답례품'?'cat-gift':'cat-side';
+      const amt = v.금액 !== undefined ? v.금액 : (v.amt || 0);
+      const qty = v.수량 !== undefined ? v.수량 : (v.qty || 0);
+      const pct = totalAmt ? (amt/totalAmt*100).toFixed(1) : '0.0';
       return `<tr>
         <td style="min-width:160px;">${nm}</td>
-        <td><span class="menu-cat-badge ${catClass}">${v.분류}</span></td>
-        <td class="val" style="min-width:70px;">${v.수량.toLocaleString()}</td>
+        <td><span class="menu-cat-badge ${catClass}">${cat}</span></td>
+        <td class="val" style="min-width:70px;">${qty.toLocaleString()}</td>
         <td class="pct" style="min-width:55px;">${pct}%</td>
-        <td class="amt" style="min-width:90px;">${fmtAmt(v.금액)}</td>
+        <td class="amt" style="min-width:90px;">${fmtAmt(amt)}</td>
       </tr>`;
     }).join('');
 
