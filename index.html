@@ -2182,6 +2182,39 @@ function selectMenuRegion(reg) {
   renderMenuRegionView();
 }
 
+// ── 공통: 카테고리 비율 바 HTML 생성 ──
+function makeCatRatioBar(rows, totalAmt) {
+  // rows: [{상품명, 수량, ...}] 또는 [{nm, qty, amt, cat}] 형태 모두 지원
+  // 직접 호두/답례/사이드 Amt 집계
+  let hAmt = 0, gAmt = 0, sAmt = 0;
+  rows.forEach(r => {
+    const cat = r.cat !== undefined ? r.cat : getCategory(r.상품명 || r.nm || '');
+    const amt = r.amt !== undefined ? r.amt : (r.금액 !== undefined ? r.금액 : 0);
+    if (cat === '호두과자') hAmt += amt;
+    else if (cat === '답례품') gAmt += amt;
+    else sAmt += amt;
+  });
+  const base = totalAmt || (hAmt + gAmt + sAmt);
+  if (!base) return '';
+  const hPct = (hAmt / base * 100).toFixed(1);
+  const gPct = (gAmt / base * 100).toFixed(1);
+  const sPct = (sAmt / base * 100).toFixed(1);
+  return `
+    <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;min-width:200px;">
+      <div style="font-size:10px;color:#6b8fa8;margin-bottom:6px;">카테고리 비율</div>
+      <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-bottom:6px;">
+        <div style="width:${hPct}%;background:#4ade80;" title="호두과자"></div>
+        <div style="width:${gPct}%;background:#facc15;" title="답례품"></div>
+        <div style="width:${sPct}%;background:#60a5fa;" title="사이드"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:10px;"><span style="color:#4ade80;">■</span> 호두과자 <span style="color:#e0f0ff;font-weight:600;">${hPct}%</span></span>
+        <span style="font-size:10px;"><span style="color:#facc15;">■</span> 답례품 <span style="color:#e0f0ff;font-weight:600;">${gPct}%</span></span>
+        <span style="font-size:10px;"><span style="color:#60a5fa;">■</span> 사이드 <span style="color:#e0f0ff;font-weight:600;">${sPct}%</span></span>
+      </div>
+    </div>`;
+}
+
 function renderMenuRegionView() {
   renderMenuRegionTabs();
   const rawData = MENU_DATA_BY_MONTH[currentMenuMonth] || [];
@@ -2314,7 +2347,7 @@ function renderMenuRegionView() {
       </div>` : '';
 
     document.getElementById('menuRegionList').innerHTML = `
-      <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
         <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">매장 수</div>
           <div style="font-size:18px;font-weight:700;color:${color};">${Object.keys(allStoreMap).length}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개점</span></div>
@@ -2327,6 +2360,7 @@ function renderMenuRegionView() {
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
           <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(regTotalAmt)}</div>
         </div>
+        ${makeCatRatioBar(baseData.map(r=>({cat:getCategory(r.상품명),amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), regTotalAmt)}
       </div>
       ${prodAnalysis}
       <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">
@@ -2408,7 +2442,7 @@ function renderMenuRegionView() {
       </div>` : '';
 
     document.getElementById('menuRegionList').innerHTML = `
-      <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
         <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;">
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 판매수량</div>
           <div style="font-size:18px;font-weight:700;color:#e0f0ff;">${grandQty.toLocaleString()}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개</span></div>
@@ -2417,6 +2451,7 @@ function renderMenuRegionView() {
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
           <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(grandTotal)}</div>
         </div>
+        ${makeCatRatioBar(filteredData.map(r=>({cat:getCategory(r.상품명),amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), grandTotal)}
       </div>
       ${prodAnalysis}
       <div style="font-size:11px;color:#6b8fa8;margin-bottom:8px;">
@@ -2566,7 +2601,7 @@ function renderMenuRegionView() {
     </div>` : '';
 
   document.getElementById('menuRegionList').innerHTML = `
-    <div style="display:flex;gap:10px;margin-bottom:12px;">
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
       <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">매장 수</div>
         <div style="font-size:18px;font-weight:700;color:${color};">${Object.keys(allStoreMap).length}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개점</span></div>
@@ -2575,6 +2610,7 @@ function renderMenuRegionView() {
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
         <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(regTotalAmt)}</div>
       </div>
+      ${makeCatRatioBar(baseData.map(r=>({cat:getCategory(r.상품명),amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), regTotalAmt)}
     </div>
     ${prodAnalysis}
     ${!q ? `<div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">메뉴별 판매 현황</div>
@@ -2725,7 +2761,7 @@ function renderMenuManagerView() {
       </tr>`;
     }).join('');
     document.getElementById('menuManagerList').innerHTML = `
-      <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
         <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid #1e3347;flex:1;">
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 판매수량</div>
           <div style="font-size:18px;font-weight:700;color:#e0f0ff;">${totalQty.toLocaleString()}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개</span></div>
@@ -2734,6 +2770,7 @@ function renderMenuManagerView() {
           <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
           <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(totalAmt)}</div>
         </div>
+        ${makeCatRatioBar(Object.entries(menuMap).map(([nm,v])=>({cat:v.분류==='호두과자'?'호두과자':v.분류==='답례품'?'답례품':'사이드',amt:v.금액})), totalAmt)}
       </div>
       <div style="font-size:11px;color:#6b8fa8;margin-bottom:6px;">메뉴별 판매 현황</div>
       <div style="overflow-x:auto;">
@@ -2810,7 +2847,7 @@ function renderMenuManagerView() {
     : '';
 
   document.getElementById('menuManagerList').innerHTML = `
-    <div style="display:flex;gap:10px;margin-bottom:12px;">
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
       <div style="background:#0d1b2a;border-radius:8px;padding:10px 16px;border:0.5px solid ${color}44;flex:1;">
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">담당 매장 수</div>
         <div style="font-size:18px;font-weight:700;color:${color};">${Object.keys(storeMap).length}<span style="font-size:11px;color:#6b8fa8;margin-left:3px;">개점</span></div>
@@ -2823,6 +2860,7 @@ function renderMenuManagerView() {
         <div style="font-size:10px;color:#6b8fa8;margin-bottom:3px;">총 매출금액</div>
         <div style="font-size:18px;font-weight:700;color:#7eb8e8;">${fmtAmt(mgrTotalAmt)}</div>
       </div>
+      ${makeCatRatioBar(filteredData.map(r=>({cat:getCategory(r.상품명),amt:(r.수량||0)*(PRICE_MAP[r.상품명]||0)})), mgrTotalAmt)}
     </div>
     <div style="font-size:11px;color:#6b8fa8;margin-bottom:8px;">
       매장별 판매 현황 <span style="font-size:10px;color:#4a6a8a;">(클릭 시 메뉴 상세)</span>
