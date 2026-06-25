@@ -2462,19 +2462,21 @@ function renderMenuRegionView() {
         <thead><tr>
           <th style="min-width:60px;">지역</th>
           <th style="min-width:200px;">${q ? '해당 상품 매출' : '카테고리별 구성 (% · 금액)'}</th>
-          <th style="text-align:right;min-width:55px;">매장수</th>
-          <th style="text-align:right;min-width:70px;">수량</th>
-          <th style="text-align:right;min-width:55px;">매출비율</th>
-          <th style="text-align:right;min-width:90px;">금액</th>
+          <th style="text-align:center;min-width:55px;">매장수</th>
+          <th style="text-align:center;min-width:90px;">평균매출</th>
+          <th style="text-align:center;min-width:70px;">수량</th>
+          <th style="text-align:center;min-width:55px;">매출비율</th>
+          <th style="text-align:center;min-width:90px;">금액</th>
         </tr></thead>
         <tbody>
-        ${sorted.length===0 ? '<tr><td colspan="6" style="text-align:center;color:#4a6a8a;padding:16px;">검색 결과 없음</td></tr>' :
+        ${sorted.length===0 ? '<tr><td colspan="7" style="text-align:center;color:#4a6a8a;padding:16px;">검색 결과 없음</td></tr>' :
           sorted.map(([reg,v])=>{
             const color=REGION_COLORS_MAP[reg]||'#6b8fa8';
             const hPct=v.amt?(v.호두과자Amt/v.amt*100).toFixed(0):0;
             const gPct=v.amt?(v.답례품Amt/v.amt*100).toFixed(0):0;
             const sPct=v.amt?(v.사이드Amt/v.amt*100).toFixed(0):0;
             const pct=grandTotal?(v.amt/grandTotal*100).toFixed(1):'0.0';
+            const avgAmt = v.stores.size ? v.amt / v.stores.size : 0;
             const catBadges = q
               ? `<span style="font-size:12px;color:#e0f0ff;font-weight:600;">${v.qty.toLocaleString()}개 · ${fmtAmt(v.amt)}</span>`
               : `<div style="display:flex;flex-direction:column;gap:2px;">
@@ -2486,10 +2488,11 @@ function renderMenuRegionView() {
               onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
               <td style="font-weight:700;color:${color};">${reg}</td>
               <td>${catBadges}</td>
-              <td class="val">${v.stores.size}</td>
-              <td class="val">${v.qty.toLocaleString()}</td>
-              <td class="pct">${pct}%</td>
-              <td class="amt">${fmtAmt(v.amt)}</td>
+              <td style="text-align:center;">${v.stores.size}</td>
+              <td style="text-align:center;">${fmtAmt(avgAmt)}</td>
+              <td style="text-align:center;">${v.qty.toLocaleString()}</td>
+              <td style="text-align:center;">${pct}%</td>
+              <td style="text-align:center;">${fmtAmt(v.amt)}</td>
             </tr>`;
           }).join('')}
         </tbody>
