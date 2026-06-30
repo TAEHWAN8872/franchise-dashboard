@@ -2066,7 +2066,7 @@ document.getElementById('fileInput').addEventListener('change',function(e){
   renderRegionTabs();
   renderMonthTabs();
   render();
-  const LAST_EDITED = '2026-06-30 15:23';
+  const LAST_EDITED = '2026-06-30 15:41';
   document.getElementById('lastUpdate').textContent='26년(1~5월) + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+LAST_EDITED+' 수정';
 })();
 
@@ -3180,26 +3180,11 @@ const REGION_COLORS = {
 };
 
 function getColor(ratio, tab){
-  // ratio: 0~1
-  if(tab==='count'){
-    // 보라 계열
-    const r = Math.round(80 + ratio*120);
-    const g = Math.round(30 + ratio*60);
-    const b = Math.round(180 + ratio*75);
-    return `rgb(${r},${g},${b})`;
-  } else if(tab==='total'){
-    // 청록 계열
-    const r = Math.round(10 + ratio*40);
-    const g = Math.round(100 + ratio*150);
-    const b = Math.round(160 + ratio*90);
-    return `rgb(${r},${g},${b})`;
-  } else {
-    // 평균: 파랑 계열
-    const r = Math.round(20 + ratio*50);
-    const g = Math.round(100 + ratio*130);
-    const b = Math.round(200 + ratio*55);
-    return `rgb(${r},${g},${b})`;
-  }
+  // ratio: 0~1 — 평균 매출 탭과 동일한 파랑 계열로 통일
+  const r = Math.round(20 + ratio*50);
+  const g = Math.round(100 + ratio*130);
+  const b = Math.round(200 + ratio*55);
+  return `rgb(${r},${g},${b})`;
 }
 
 function fmtAmt2(v){
@@ -3310,7 +3295,7 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
   defs.append('filter').attr('id','d3shadow')
     .html('<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.4"/>');
   const grad = defs.append('linearGradient').attr('id','d3legendGrad').attr('x1','0').attr('x2','1').attr('y1','0').attr('y2','0');
-  const gradColors = tab==='count'?['#1a3a5c','#22c55e','#86efac']:tab==='avg'?['#1a3a5c','#38bdf8','#7dd3fc']:['#1a3a5c','#a78bfa','#e879f9'];
+  const gradColors = ['#1a3a5c','#38bdf8','#7dd3fc'];
   grad.append('stop').attr('offset','0%').attr('stop-color',gradColors[0]);
   grad.append('stop').attr('offset','50%').attr('stop-color',gradColors[1]);
   grad.append('stop').attr('offset','100%').attr('stop-color',gradColors[2]);
@@ -3336,7 +3321,7 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
       const ratio = maxVal>0 ? rawVal/maxVal : 0;
       const fill = stat.count>0 ? (REGION_COLORS[regionName] || getColor(ratio,tab)) : '#152236';
       // 매출/매장수가 많을수록 더 진하게, 적을수록 옅게 — 같은 색 계열 안에서 농도로 구분
-      const fillOpacity = stat.count>0 ? Math.max(0.5, ratio) : 1;
+      const fillOpacity = stat.count>0 ? 0.92 : 1;
       const opacity = stat.count>0 ? 1 : 0.45;
 
       gEl.append('path')
