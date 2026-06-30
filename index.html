@@ -3275,9 +3275,9 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
           // 서로 겹치므로, 지도 위에 직접 쓰지 않고 인출선(leader line)으로 빼서 표시한다.
           smallLabels.push({ name: regionName, centroid, fill, displayVal, hasData: stat.count>0 });
         } else {
-          const fs = 10;
+          const fs = 13;
           gEl.append('text')
-            .attr('x',centroid[0]).attr('y',centroid[1]-(displayVal?5:0))
+            .attr('x',centroid[0]).attr('y',centroid[1]-(displayVal?6:0))
             .attr('text-anchor','middle').attr('font-size',fs)
             .attr('fill',stat.count>0?'#fff':'#4a6a8a')
             .attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif")
@@ -3285,8 +3285,8 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
             .text(regionName);
           if(displayVal){
             gEl.append('text')
-              .attr('x',centroid[0]).attr('y',centroid[1]+7)
-              .attr('text-anchor','middle').attr('font-size',Math.max(fs-2,6))
+              .attr('x',centroid[0]).attr('y',centroid[1]+9)
+              .attr('text-anchor','middle').attr('font-size',Math.max(fs-3,8))
               .attr('fill','rgba(255,255,255,0.9)').attr('font-weight','600')
               .attr('font-family','sans-serif').attr('pointer-events','none')
               .text(displayVal);
@@ -3314,57 +3314,74 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
     });
 
   // ── 겹치는 소규모 지역 인출선(leader line) 라벨 ──
-  // 지도 오른쪽 가장자리에 세로로 나열하고, 각 지역 중심점까지 가는 선을 그려
-  // 어떤 라벨이 어떤 지역인지 한눈에 알 수 있게 한다 (서울/인천/대전/광주/세종/대구/울산/부산).
+  // 지도 가운데(w/2)를 기준으로 왼쪽 지역은 왼쪽 가까이, 오른쪽 지역은 오른쪽 가까이에
+  // 라벨을 배치해서 실제 위치와 가깝게 보이도록 한다 (서울/인천/대전/광주/세종/대구/울산/부산).
   if(smallLabels.length){
-    smallLabels.sort((a,b)=>a.centroid[1]-b.centroid[1]); // 위→아래 순서로 정렬
-    const labelX = w - 6;          // 라벨 칼럼 x좌표 (오른쪽 끝에 붙임)
-    const startY = 14;
-    const stepY = Math.min(17, Math.max(13, (h-40)/smallLabels.length));
+    const midX = w/2;
+    const leftItems = smallLabels.filter(it=>it.centroid[0] < midX).sort((a,b)=>a.centroid[1]-b.centroid[1]);
+    const rightItems = smallLabels.filter(it=>it.centroid[0] >= midX).sort((a,b)=>a.centroid[1]-b.centroid[1]);
     const leaderG = g.append('g').attr('class','leader-labels');
+    const BW = 42, BH = 20, FS_NAME = 11, FS_VAL = 8.5;
 
-    smallLabels.forEach((item, i)=>{
-      const ly = startY + i*stepY;
-      const lx = labelX;
+    function layoutSide(items, side){
+      if(!items.length) return;
+      // 라벨 칼럼 x : 해당 그룹의 평균 위치에서 살짝 바깥쪽으로
+      const avgX = d3.mean(items, it=>it.centroid[0]);
+      let colX = side==='left' ? Math.max(BW/2+6, avgX - 92) : Math.min(w-BW/2-6, avgX + 92);
+      // 세로 간격: 겹치지 않도록 그룹 내에서 균등 분배 (가능하면 실제 y 근처 유지)
+      const minGap = BH + 10;
+      const ys = items.map(it=>it.centroid[1]);
+      const top = Math.max(16, Math.min(...ys) - (items.length-1)*minGap/2);
+      items.forEach((item, i)=>{
+        const ly = top + i*minGap;
+        const lx = colX;
+        const labelLeftX = side==='left' ? lx - BW/2 : lx - BW/2;
+        const connectFromX = side==='left' ? lx + BW/2 : lx - BW/2;
 
-      // 인출선: 지역 중심점 → 꺾이는 점 → 라벨
-      const bendX = Math.min(item.centroid[0] + 26, lx - 34);
-      leaderG.append('path')
-        .attr('d', `M${item.centroid[0]},${item.centroid[1]} L${bendX},${ly} L${lx-30},${ly}`)
-        .attr('fill','none')
-        .attr('stroke', item.hasData ? item.fill : '#3a5570')
-        .attr('stroke-width', 1)
-        .attr('opacity', 0.85)
-        .attr('pointer-events','none');
+        // 인출선: 지역 중심점 → 라벨
+        const bendX = side==='left'
+          ? Math.max(item.centroid[0] - 45, connectFromX)
+          : Math.min(item.centroid[0] + 45, connectFromX);
+        leaderG.append('path')
+          .attr('d', `M${item.centroid[0]},${item.centroid[1]} L${bendX},${ly} L${connectFromX},${ly}`)
+          .attr('fill','none')
+          .attr('stroke', item.hasData ? item.fill : '#3a5570')
+          .attr('stroke-width', 1.1)
+          .attr('opacity', 0.85)
+          .attr('pointer-events','none');
 
-      // 중심점 작은 점
-      leaderG.append('circle')
-        .attr('cx', item.centroid[0]).attr('cy', item.centroid[1]).attr('r', 2)
-        .attr('fill', item.hasData ? item.fill : '#3a5570')
-        .attr('stroke','#0d1e30').attr('stroke-width',0.6)
-        .attr('pointer-events','none');
+        // 중심점 작은 점
+        leaderG.append('circle')
+          .attr('cx', item.centroid[0]).attr('cy', item.centroid[1]).attr('r', 2.2)
+          .attr('fill', item.hasData ? item.fill : '#3a5570')
+          .attr('stroke','#0d1e30').attr('stroke-width',0.6)
+          .attr('pointer-events','none');
 
-      // 라벨 배지
-      const badge = leaderG.append('g').attr('pointer-events','none');
-      badge.append('rect')
-        .attr('x', lx-30).attr('y', ly-7.5).attr('width', 30).attr('height', 15)
-        .attr('rx', 3).attr('fill','rgba(13,30,48,0.88)')
-        .attr('stroke', item.hasData ? item.fill : '#3a5570').attr('stroke-width', 0.8);
-      badge.append('text')
-        .attr('x', lx-15).attr('y', ly - (item.displayVal? 1 : -3))
-        .attr('text-anchor','middle').attr('font-size', 7)
-        .attr('fill','#fff').attr('font-weight','700')
-        .attr('font-family',"'Noto Sans KR',sans-serif")
-        .text(item.name);
-      if(item.displayVal){
+        // 라벨 배지
+        const badge = leaderG.append('g').attr('pointer-events','none');
+        badge.append('rect')
+          .attr('x', labelLeftX).attr('y', ly-BH/2).attr('width', BW).attr('height', BH)
+          .attr('rx', 4).attr('fill','rgba(13,30,48,0.92)')
+          .attr('stroke', item.hasData ? item.fill : '#3a5570').attr('stroke-width', 1);
         badge.append('text')
-          .attr('x', lx-15).attr('y', ly + 6)
-          .attr('text-anchor','middle').attr('font-size', 5.5)
-          .attr('fill','rgba(255,255,255,0.85)').attr('font-weight','600')
-          .attr('font-family','sans-serif')
-          .text(item.displayVal);
-      }
-    });
+          .attr('x', lx).attr('y', ly - (item.displayVal? 2 : -3.5))
+          .attr('text-anchor','middle').attr('font-size', FS_NAME)
+          .attr('fill','#fff').attr('font-weight','700')
+          .attr('font-family',"'Noto Sans KR',sans-serif")
+          .text(item.name);
+        if(item.displayVal){
+          badge.append('text')
+            .attr('x', lx).attr('y', ly + 8)
+            .attr('text-anchor','middle').attr('font-size', FS_VAL)
+            .attr('fill','rgba(255,255,255,0.9)').attr('font-weight','600')
+            .attr('font-family','sans-serif')
+            .text(item.displayVal);
+        }
+      });
+    }
+
+    layoutSide(leftItems, 'left');
+    layoutSide(rightItems, 'right');
   }
 
   // ── 줌(확대/축소) 기능: 마우스 휠 + +/− 버튼 ──
