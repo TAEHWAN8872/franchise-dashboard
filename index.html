@@ -2992,7 +2992,7 @@ renderMenuMonthTabs();
      지역별 지도 그래프 모달
 ════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="mapModal" style="z-index:3000;">
-  <div class="modal-box" style="max-width:1200px;max-height:96vh;overflow:hidden;display:flex;flex-direction:column;padding:18px 20px;">
+  <div class="modal-box" style="max-width:1560px;width:96vw;max-height:96vh;overflow:hidden;display:flex;flex-direction:column;padding:18px 20px;">
     <!-- 헤더 -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0;">
       <div>
@@ -3012,10 +3012,16 @@ renderMenuMonthTabs();
     <!-- 본문: 지도 + 순위 -->
     <div style="display:flex;gap:14px;flex:1;overflow:hidden;min-height:0;">
       <!-- 한국 SVG 지도 -->
-      <div style="flex:1.4;min-width:0;overflow:auto;background:linear-gradient(145deg,#0a1628,#0d1e30);border-radius:12px;border:0.5px solid #1e3347;display:flex;align-items:center;justify-content:center;position:relative;">
+      <div style="flex:2.1;min-width:0;overflow:hidden;background:linear-gradient(145deg,#0a1628,#0d1e30);border-radius:12px;border:0.5px solid #1e3347;display:flex;align-items:center;justify-content:center;position:relative;">
         <!-- 바다 표현 배경 점 -->
         <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(30,80,140,0.12) 0%,transparent 60%);border-radius:12px;pointer-events:none;"></div>
-        <div id="mapContainer" style="width:100%;height:100%;min-height:460px;position:relative;display:flex;align-items:center;justify-content:center;"></div>
+        <div id="mapContainer" style="width:100%;height:100%;min-height:680px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div>
+        <!-- 줌 컨트롤 -->
+        <div id="mapZoomCtrl" style="position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:4px;z-index:5;">
+          <button onclick="mapZoomBy(1.3)" title="확대" style="width:30px;height:30px;border-radius:7px;border:0.5px solid #2a5a8a;background:rgba(13,30,48,0.9);color:#aac4e0;font-size:16px;font-weight:700;cursor:pointer;line-height:1;">+</button>
+          <button onclick="mapZoomBy(1/1.3)" title="축소" style="width:30px;height:30px;border-radius:7px;border:0.5px solid #2a5a8a;background:rgba(13,30,48,0.9);color:#aac4e0;font-size:16px;font-weight:700;cursor:pointer;line-height:1;">−</button>
+          <button onclick="mapZoomReset()" title="초기화" style="width:30px;height:30px;border-radius:7px;border:0.5px solid #2a5a8a;background:rgba(13,30,48,0.9);color:#aac4e0;font-size:11px;font-weight:700;cursor:pointer;line-height:1;">⟲</button>
+        </div>
       </div>
       <!-- 순위 패널 -->
       <div style="width:260px;flex-shrink:0;background:#0d1b2a;border-radius:12px;border:0.5px solid #1e3347;padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:0;">
@@ -3228,6 +3234,8 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
   const path = d3.geoPath().projection(projection);
 
   const g = svg.append('g');
+  const SMALL_REGIONS = ['세종','서울','인천','대전','광주','울산','대구','부산'];
+  const smallLabels = []; // 겹치는 소규모 지역 레이블을 따로 모아 옆으로 빼서 표시
 
   g.selectAll('path')
     .data(window.__koreaGeo.features)
@@ -3255,27 +3263,34 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
       // 지역명 레이블
       const centroid = path.centroid(d);
       if(centroid && !isNaN(centroid[0])){
-        const isSmall = ['세종','서울','인천','대전','광주','울산','대구','부산'].includes(regionName);
-        const fs = isSmall ? 7 : 10;
+        const isSmall = SMALL_REGIONS.includes(regionName);
         let displayVal = '';
         if(stat.count>0){
           if(tab==='count') displayVal = stat.count+'개';
           else { const m=Math.round((tab==='avg'?stat.avg:stat.total)/10000); displayVal = m>=10000?Math.floor(m/10000)+'억':m.toLocaleString()+'만'; }
         }
-        gEl.append('text')
-          .attr('x',centroid[0]).attr('y',centroid[1]-(displayVal?5:0))
-          .attr('text-anchor','middle').attr('font-size',fs)
-          .attr('fill',stat.count>0?'#fff':'#4a6a8a')
-          .attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif")
-          .attr('pointer-events','none')
-          .text(regionName);
-        if(displayVal){
+
+        if(isSmall){
+          // 작은 지역(서울/인천/세종/대전/광주/대구/울산/부산)은 모양이 작아 라벨이
+          // 서로 겹치므로, 지도 위에 직접 쓰지 않고 인출선(leader line)으로 빼서 표시한다.
+          smallLabels.push({ name: regionName, centroid, fill, displayVal, hasData: stat.count>0 });
+        } else {
+          const fs = 10;
           gEl.append('text')
-            .attr('x',centroid[0]).attr('y',centroid[1]+7)
-            .attr('text-anchor','middle').attr('font-size',Math.max(fs-2,6))
-            .attr('fill','rgba(255,255,255,0.9)').attr('font-weight','600')
-            .attr('font-family','sans-serif').attr('pointer-events','none')
-            .text(displayVal);
+            .attr('x',centroid[0]).attr('y',centroid[1]-(displayVal?5:0))
+            .attr('text-anchor','middle').attr('font-size',fs)
+            .attr('fill',stat.count>0?'#fff':'#4a6a8a')
+            .attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif")
+            .attr('pointer-events','none')
+            .text(regionName);
+          if(displayVal){
+            gEl.append('text')
+              .attr('x',centroid[0]).attr('y',centroid[1]+7)
+              .attr('text-anchor','middle').attr('font-size',Math.max(fs-2,6))
+              .attr('fill','rgba(255,255,255,0.9)').attr('font-weight','600')
+              .attr('font-family','sans-serif').attr('pointer-events','none')
+              .text(displayVal);
+          }
         }
       }
 
@@ -3298,12 +3313,88 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
       });
     });
 
+  // ── 겹치는 소규모 지역 인출선(leader line) 라벨 ──
+  // 지도 오른쪽 가장자리에 세로로 나열하고, 각 지역 중심점까지 가는 선을 그려
+  // 어떤 라벨이 어떤 지역인지 한눈에 알 수 있게 한다 (서울/인천/대전/광주/세종/대구/울산/부산).
+  if(smallLabels.length){
+    smallLabels.sort((a,b)=>a.centroid[1]-b.centroid[1]); // 위→아래 순서로 정렬
+    const labelX = w - 6;          // 라벨 칼럼 x좌표 (오른쪽 끝에 붙임)
+    const startY = 14;
+    const stepY = Math.min(17, Math.max(13, (h-40)/smallLabels.length));
+    const leaderG = g.append('g').attr('class','leader-labels');
+
+    smallLabels.forEach((item, i)=>{
+      const ly = startY + i*stepY;
+      const lx = labelX;
+
+      // 인출선: 지역 중심점 → 꺾이는 점 → 라벨
+      const bendX = Math.min(item.centroid[0] + 26, lx - 34);
+      leaderG.append('path')
+        .attr('d', `M${item.centroid[0]},${item.centroid[1]} L${bendX},${ly} L${lx-30},${ly}`)
+        .attr('fill','none')
+        .attr('stroke', item.hasData ? item.fill : '#3a5570')
+        .attr('stroke-width', 1)
+        .attr('opacity', 0.85)
+        .attr('pointer-events','none');
+
+      // 중심점 작은 점
+      leaderG.append('circle')
+        .attr('cx', item.centroid[0]).attr('cy', item.centroid[1]).attr('r', 2)
+        .attr('fill', item.hasData ? item.fill : '#3a5570')
+        .attr('stroke','#0d1e30').attr('stroke-width',0.6)
+        .attr('pointer-events','none');
+
+      // 라벨 배지
+      const badge = leaderG.append('g').attr('pointer-events','none');
+      badge.append('rect')
+        .attr('x', lx-30).attr('y', ly-7.5).attr('width', 30).attr('height', 15)
+        .attr('rx', 3).attr('fill','rgba(13,30,48,0.88)')
+        .attr('stroke', item.hasData ? item.fill : '#3a5570').attr('stroke-width', 0.8);
+      badge.append('text')
+        .attr('x', lx-15).attr('y', ly - (item.displayVal? 1 : -3))
+        .attr('text-anchor','middle').attr('font-size', 7)
+        .attr('fill','#fff').attr('font-weight','700')
+        .attr('font-family',"'Noto Sans KR',sans-serif")
+        .text(item.name);
+      if(item.displayVal){
+        badge.append('text')
+          .attr('x', lx-15).attr('y', ly + 6)
+          .attr('text-anchor','middle').attr('font-size', 5.5)
+          .attr('fill','rgba(255,255,255,0.85)').attr('font-weight','600')
+          .attr('font-family','sans-serif')
+          .text(item.displayVal);
+      }
+    });
+  }
+
+  // ── 줌(확대/축소) 기능: 마우스 휠 + +/− 버튼 ──
+  const zoomBehavior = d3.zoom()
+    .scaleExtent([1, 8])
+    .translateExtent([[0,0],[w,h]])
+    .on('zoom', (event)=>{ g.attr('transform', event.transform); });
+  svg.call(zoomBehavior).on('dblclick.zoom', null);
+  window.__mapZoom = window.__mapZoom || {};
+  window.__mapZoom[containerId] = { svg, zoomBehavior };
+
   // 범례
   const lgX = 10, lgY = h-18;
   svg.append('text').attr('x',lgX).attr('y',lgY).attr('font-size',8).attr('fill','#6b8fa8').text('낮음');
   svg.append('rect').attr('x',lgX+28).attr('y',lgY-9).attr('width',100).attr('height',9).attr('rx',3).attr('fill','url(#d3legendGrad)').attr('opacity',0.85);
   svg.append('text').attr('x',lgX+134).attr('y',lgY).attr('font-size',8).attr('fill','#6b8fa8').text('높음');
 }
+
+// ── 줌 버튼 핸들러 ──
+function mapZoomBy(factor){
+  const z = window.__mapZoom && window.__mapZoom['mapContainer'];
+  if(!z) return;
+  z.svg.transition().duration(200).call(z.zoomBehavior.scaleBy, factor);
+}
+function mapZoomReset(){
+  const z = window.__mapZoom && window.__mapZoom['mapContainer'];
+  if(!z) return;
+  z.svg.transition().duration(250).call(z.zoomBehavior.transform, d3.zoomIdentity);
+}
+
 
 // ── 모달 지도 렌더링 ──
 function renderMap(){
