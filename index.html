@@ -20,6 +20,16 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
 .upload-btn{font-size:11px;padding:5px 12px;background:#1a3a5c;border:0.5px solid #2a5a8a;color:#7eb8e8;border-radius:6px;cursor:pointer;}
 .upload-btn:hover{background:#1e4a70;}
 #fileInput{display:none;}
+/* 매장명 가리기 */
+body.hide-names .store-name{
+  filter:blur(5px);
+  user-select:none;
+  transition:filter 0.2s;
+}
+body.hide-names .store-name:hover{
+  filter:blur(0);
+}
+.mask-btn-on{background:rgba(251,146,60,0.15)!important;border-color:#fb923c!important;color:#fb923c!important;}
 
 /* 탭 */
 .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
@@ -216,6 +226,9 @@ body{background:#0a1628;color:#fff;font-family:'Pretendard','Noto Sans KR',sans-
       </label>
       <button class="upload-btn" onclick="openMapModal()" style="border-color:#a78bfa;color:#a78bfa;cursor:pointer;">
         🗺️ 그래프 만들기
+      </button>
+      <button class="upload-btn" id="maskBtn" onclick="toggleMaskNames()" style="border-color:#6b8fa8;color:#6b8fa8;cursor:pointer;">
+        👁️ 매장명 가리기
       </button>
     </div>
   </div>
@@ -692,7 +705,7 @@ function showSuggestions(val){
     <div onclick="selectBranch('${b.name.replace(/'/g,"\\'")}')"
       style="padding:7px 12px;font-size:11px;color:#c8dff0;cursor:pointer;border-bottom:0.5px solid #1a2f44;"
       onmouseover="this.style.background='#1a3a5c'" onmouseout="this.style.background=''">
-      <span style="color:#e0f0ff;font-weight:600;">${b.name}</span>
+      <span class="store-name" style="color:#e0f0ff;font-weight:600;">${b.name}</span>
       <span style="color:#6b8fa8;font-size:10px;margin-left:6px;">${b.manager} · ${b.region}</span>
     </div>`).join('');
   box.style.display='block';
@@ -1139,7 +1152,7 @@ function renderPie(data, lastIdx){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
         <div style="display:flex;align-items:center;gap:5px;">
           <span style="width:16px;text-align:center;font-size:11px;">${medal}</span>
-          <span style="font-size:10px;color:#c8dff0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;">${b.name}</span>
+          <span class="store-name" style="font-size:10px;color:#c8dff0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;">${b.name}</span>
         </div>
         <span style="font-size:11px;font-weight:600;color:#e0f0ff;">${fmt(b.lastVal)}</span>
       </div>
@@ -1233,7 +1246,7 @@ function renderBranches(lastIdx){
     const yoyCls=v25>0&&cur>=v25?'pos':'neg';
     return `<div class="bi branch-item" data-idx="${idx}" style="cursor:pointer;" title="${b.name} 클릭 시 월별 상세 보기">
       <div class="bh">
-        <span class="bn" title="${b.name}">${b.name}</span>
+        <span class="bn store-name" title="${b.name}">${b.name}</span>
         <div class="binfo">
           <span class="badge ${cls}">${lbl}${goal>0?' '+r+'%':''}</span>
           <span class="bv">${fmt(cur)}</span>
@@ -1403,7 +1416,7 @@ function openKpiModal(type){
       <div class="kml-left">
         <span class="kml-rank">${i+1}</span>
         <div>
-          <div class="kml-name">${b.name}</div>
+          <div class="kml-name store-name">${b.name}</div>
           <div class="kml-mgr">${b.manager} · ${b.region}</div>
         </div>
       </div>
@@ -1446,6 +1459,7 @@ function openBranchModal(b){
   const pad=Math.round((maxV-minV)*0.2)||100;
 
   document.getElementById('modalTitle').textContent=b.name+' — 월별 매출 비교 (25년 vs 26년)';
+  document.getElementById('modalTitle').classList.toggle('store-name', true);
   document.getElementById('modalSub').textContent=b.manager+' · '+b.region+' · 목표: 전년 동월 대비 5%↑';
   document.getElementById('branchModal').classList.add('open');
 
@@ -2333,7 +2347,7 @@ function renderMenuRegionView() {
       const sharePct = regTotalAmt ? (v.totalAmt/regTotalAmt*100).toFixed(1) : 0;
       return `<tr style="cursor:pointer;" onclick="openMenuRegionStoreModal('${storeName}',${v.totalQty},${v.totalAmt},decodeURIComponent('${menusJson}'))"
         onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
-        <td style="color:#c8dff0;font-weight:600;">${storeName}</td>
+        <td style="color:#c8dff0;font-weight:600;"><span class="store-name">${storeName}</span></td>
         <td><div style="display:flex;flex-direction:column;gap:2px;">${prodBadges}</div></td>
         <td class="val">${v.totalQty.toLocaleString()}</td>
         <td class="pct">${sharePct}%</td>
@@ -2601,7 +2615,7 @@ function renderMenuRegionView() {
     const sharePct=regTotalAmt?(v.totalAmt/regTotalAmt*100).toFixed(1):0;
     return `<tr style="cursor:pointer;" onclick="openMenuRegionStoreModal('${storeName}',${v.totalQty},${v.totalAmt},decodeURIComponent('${menusJson}'))"
       onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
-      <td style="color:#c8dff0;font-weight:600;">${storeName}</td>
+      <td style="color:#c8dff0;font-weight:600;"><span class="store-name">${storeName}</span></td>
       <td><div style="display:flex;flex-direction:column;gap:2px;">${prodBadges}</div></td>
       <td class="val">${v.totalQty.toLocaleString()}</td>
       <td class="pct">${sharePct}%</td>
@@ -2862,7 +2876,7 @@ function renderMenuManagerView() {
       const menusJson = encodeURIComponent(JSON.stringify({ storeName, menus: v.menus, totalQty: v.totalQty, totalAmt: v.totalAmt }));
       return `<tr style="cursor:pointer;" onclick="openMenuStoreModal('${storeName}', ${v.totalQty}, ${v.totalAmt}, decodeURIComponent('${menusJson}'))"
         onmouseover="this.style.background='#172840'" onmouseout="this.style.background=''">
-        <td style="color:#c8dff0;font-weight:600;">${storeName}</td>
+        <td style="color:#c8dff0;font-weight:600;"><span class="store-name">${storeName}</span></td>
         <td>
           <div style="display:flex;flex-direction:column;gap:2px;">
             <span class="menu-cat-badge cat-walnut" style="display:inline-flex;justify-content:space-between;gap:6px;"><span>호두과자 ${hPct}%</span><span style="opacity:0.8;">${fmtAmt(v.호두과자Amt)}</span></span>
@@ -3370,6 +3384,21 @@ function onRegionClick(regionName){
     setRegion(regionName);
     // 지역 탭 시각적 업데이트
     updateTabActive();
+  }
+}
+
+// ── 매장명 가리기 ──
+let _namesHidden = false;
+function toggleMaskNames() {
+  _namesHidden = !_namesHidden;
+  document.body.classList.toggle('hide-names', _namesHidden);
+  const btn = document.getElementById('maskBtn');
+  if (_namesHidden) {
+    btn.textContent = '👁️ 매장명 보기';
+    btn.classList.add('mask-btn-on');
+  } else {
+    btn.textContent = '👁️ 매장명 가리기';
+    btn.classList.remove('mask-btn-on');
   }
 }
 </script>
