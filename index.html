@@ -2066,8 +2066,8 @@ document.getElementById('fileInput').addEventListener('change',function(e){
   renderRegionTabs();
   renderMonthTabs();
   render();
-  const _now = new Date();
-  document.getElementById('lastUpdate').textContent='26년(1~5월) + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+_now.toLocaleDateString('ko-KR')+' '+_now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' 기준';
+  const LAST_EDITED = '2026-06-30 15:23';
+  document.getElementById('lastUpdate').textContent='26년(1~5월) + 25년 연간 데이터 · '+ALL.length+'개 매장 · '+LAST_EDITED+' 수정';
 })();
 
 
@@ -3171,6 +3171,14 @@ const REGION_PATH_MAP = {
 };
 
 // 탭별 색상 스펙트럼
+// ── 메인 대시보드 탭과 동일한 지역별 고정 색상 ──
+const REGION_COLORS = {
+  '서울':'#3b82f6', '경기':'#22c55e', '인천':'#06b6d4', '부산':'#f97316',
+  '대구':'#a855f7', '광주':'#ec4899', '대전':'#facc15', '울산':'#14b8a6',
+  '세종':'#84cc16', '충북':'#fb923c', '충남':'#f43f5e', '경북':'#8b5cf6',
+  '경남':'#0ea5e9', '전북':'#d946ef', '전남':'#10b981', '강원':'#f59e0b',
+};
+
 function getColor(ratio, tab){
   // ratio: 0~1
   if(tab==='count'){
@@ -3326,12 +3334,15 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
       const stat = valueMap[regionName] || {value:0,count:0,avg:0,total:0};
       const rawVal = tab==='avg'?stat.avg : tab==='count'?stat.count : stat.total;
       const ratio = maxVal>0 ? rawVal/maxVal : 0;
-      const fill = stat.count>0 ? getColor(ratio,tab) : '#152236';
+      const fill = stat.count>0 ? (REGION_COLORS[regionName] || getColor(ratio,tab)) : '#152236';
+      // 매출/매장수가 많을수록 더 진하게, 적을수록 옅게 — 같은 색 계열 안에서 농도로 구분
+      const fillOpacity = stat.count>0 ? Math.max(0.5, ratio) : 1;
       const opacity = stat.count>0 ? 1 : 0.45;
 
       gEl.append('path')
         .attr('d', path(d))
         .attr('fill', fill)
+        .attr('fill-opacity', fillOpacity)
         .attr('stroke','#0d1e30')
         .attr('stroke-width', stat.count>0?1.5:0.8)
         .attr('opacity', opacity)
@@ -3481,8 +3492,9 @@ function renderD3Map(containerId, tab, rankListId, rankTitleId, onClickRegion){
   // 범례
   const lgX = 10, lgY = h-18;
   svg.append('text').attr('x',lgX).attr('y',lgY).attr('font-size',8).attr('fill','#6b8fa8').text('낮음');
-  svg.append('rect').attr('x',lgX+28).attr('y',lgY-9).attr('width',100).attr('height',9).attr('rx',3).attr('fill','url(#d3legendGrad)').attr('opacity',0.85);
+  svg.append('rect').attr('x',lgX+28).attr('y',lgY-9).attr('width',100).attr('height',9).attr('rx',3).attr('fill','#7eb8e8').attr('opacity',0.85);
   svg.append('text').attr('x',lgX+134).attr('y',lgY).attr('font-size',8).attr('fill','#6b8fa8').text('높음');
+  svg.append('text').attr('x',lgX+148).attr('y',lgY).attr('font-size',8).attr('fill','#4a6a8a').text('(지역 고유색 · 진할수록 수치↑)');
 }
 
 // ── 줌 버튼 핸들러 ──
