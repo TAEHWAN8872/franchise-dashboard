@@ -477,7 +477,7 @@ body.hide-names .store-name:hover{
 
 
 <!-- 매장 월별 매출 모달 -->
-<div class="modal-overlay" id="branchModal">
+<div class="modal-overlay" id="branchModal" style="z-index:4000;">
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal()">✕</button>
     <div class="modal-title" id="modalTitle">-</div>
@@ -527,6 +527,12 @@ let currentSearch = '';
 let selectedMonthIdx = -1; // -1 = 최신월 자동
 let charts = {};
 let currentTrendTab = 'avg'; // 'avg' | 'log'
+
+function escapeAttr(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
+    .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
 function fmt(n){
   const m = Math.round(n/10000);
@@ -1439,7 +1445,7 @@ function openKpiModal(type){
   el.innerHTML=branches.map((b,i)=>{
     const rateTxt=b.rate!==null?(b.rate>=0?'+':'')+b.rate.toFixed(1)+'%':'-%';
     const rateCls=b.rate>=5?'pos':b.rate>=0?'warn':'neg';
-    return `<div class="kml-item" style="cursor:pointer;" onclick="closeKpiModal();openBranchModal(window.__allMap&&window.__allMap['${b.name}']||${JSON.stringify(b)})">
+    return `<div class="kml-item" data-bname="${escapeAttr(b.name)}" style="cursor:pointer;">
       <div class="kml-left">
         <span class="kml-rank">${i+1}</span>
         <div>
@@ -1453,6 +1459,14 @@ function openKpiModal(type){
       </div>
     </div>`;
   }).join('');
+  el.querySelectorAll('.kml-item').forEach(item=>{
+    item.addEventListener('click',function(){
+      const name=this.dataset.bname;
+      const b=window.__allMap&&window.__allMap[name];
+      closeKpiModal();
+      if(b) openBranchModal(b);
+    });
+  });
 }
 
 function closeKpiModal(){
@@ -1487,7 +1501,7 @@ function openRegionModal(regionName){
     el.innerHTML = branches.map((b,i)=>{
       const rateTxt = b.rate!==null ? (b.rate>=0?'+':'')+b.rate.toFixed(1)+'%' : '-%';
       const rateCls = b.rate>=5?'pos':b.rate>=0?'warn':'neg';
-      return `<div class="kml-item" style="cursor:pointer;" onclick="closeRegionModal();openBranchModal(window.__allMap&&window.__allMap['${b.name}']||${JSON.stringify(b)})">
+      return `<div class="kml-item" data-bname="${escapeAttr(b.name)}" style="cursor:pointer;">
         <div class="kml-left">
           <span class="kml-rank">${i+1}</span>
           <div>
@@ -1501,6 +1515,14 @@ function openRegionModal(regionName){
         </div>
       </div>`;
     }).join('');
+    el.querySelectorAll('.kml-item').forEach(item=>{
+      item.addEventListener('click',function(){
+        const name=this.dataset.bname;
+        const b=window.__allMap&&window.__allMap[name];
+        closeRegionModal();
+        if(b) openBranchModal(b);
+      });
+    });
   }
 
   document.getElementById('regionModal').classList.add('open');
@@ -1524,7 +1546,7 @@ let modalChartInst=null;
 function openBranchModal(b){
   const LOGISTICS = window.LOGISTICS || {};
   const active26=b.months.map((v,i)=>({v,i})).filter(x=>x.v>0);
-  if(!active26.length) return;
+  if(!active26.length){ alert(b.name+': 26년 매출 데이터가 없습니다.'); return; }
   const d25=ALL25[b.name]||null;
   const labels=MONTHS; // 전체 12개월
   const vals26=b.months.map(v=>v>0?Math.round(v/10000):null);
